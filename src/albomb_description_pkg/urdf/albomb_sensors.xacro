@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+
+  <link name="ego_racecar/imu">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.05 0.05 0.05"/>
+      </geometry>
+      <material name="Red"/>
+    </visual>
+  </link>
+
+  <joint name="imu_joint" type="fixed">
+    <parent link="ego_racecar/base_link"/>
+    <child link="ego_racecar/imu"/>
+    <origin xyz="0.07 0.0 0.09" rpy="0 0 -1.5708"/> <!-- z:0.04 + 바퀴반지름 0.05-->
+  </joint>
+
+  <link name="ego_racecar/laser">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://albomb_description_pkg/meshes/UST-10LXB.stl" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="Blue"/>
+    </visual>
+  </link>
+
+  <joint name="laser_joint" type="fixed">
+    <parent link="ego_racecar/base_link"/>
+    <child link="ego_racecar/laser"/>
+    <origin xyz="0.259 0.0 0.1268" rpy="0 0 0"/> <!-- z:0.0768 + 바퀴반지름 0.05-->
+  </joint>
+
+
+</robot>
