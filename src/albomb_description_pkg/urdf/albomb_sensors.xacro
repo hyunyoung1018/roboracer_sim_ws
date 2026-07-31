@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://ros.org/wiki/xacro">
 
-  <link name="ego_racecar/imu">
+  <link name="${car_name}/imu">
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
@@ -12,12 +12,12 @@
   </link>
 
   <joint name="imu_joint" type="fixed">
-    <parent link="ego_racecar/base_link"/>
-    <child link="ego_racecar/imu"/>
-    <origin xyz="0.07 0.0 0.09" rpy="0 0 -1.5708"/> <!-- z:0.04 + 바퀴반지름 0.05-->
+    <parent link="${car_name}/base_link"/>
+    <child link="${car_name}/imu"/>
+    <origin xyz="0.07 0.0 ${wheel_radius+0.04}" rpy="0 0 -1.5708"/>
   </joint>
 
-  <link name="ego_racecar/laser">
+  <link name="${car_name}/laser">
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
@@ -28,10 +28,10 @@
   </link>
 
   <joint name="laser_joint" type="fixed">
-    <parent link="ego_racecar/base_link"/>
-    <child link="ego_racecar/laser"/>
-    <origin xyz="0.259 0.0 0.1268" rpy="0 0 0"/> <!-- z:0.0768 + 바퀴반지름 0.05-->
+    <parent link="${car_name}/base_link"/>
+    <child link="${car_name}/laser"/>
+    <origin xyz="0.259 0.0 ${wheel_radius+0.0768}" rpy="0 0 0"/>
   </joint>
 
-
+  
 </robot>

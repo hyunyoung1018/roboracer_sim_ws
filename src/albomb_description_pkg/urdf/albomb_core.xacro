@@ -1,8 +1,11 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://ros.org/wiki/xacro">
 
-  <xacro:property name="wheel_radius" value="0.05" />
-  <xacro:property name="wheel_length" value="0.045" />
+  <xacro:property name="car_name" value="ego_racecar" />
+  <xacro:property name="wheel_track" value="0.228" />     <!-- 윤거 -->
+  <xacro:property name="wheel_base" value="0.324" />      <!-- 축거 -->
+  <xacro:property name="wheel_radius" value="0.05" />     <!-- 바퀴 반지름 -->
+  <xacro:property name="wheel_length" value="0.045" />    <!-- 바퀴 두께 -->
 
   <material name="Black">
     <color rgba="0.0 0.0 0.0 1.0"/>
@@ -17,7 +20,7 @@
     <color rgba="1.0 0 0 1.0"/>
   </material>
 
-  <link name="ego_racecar/base_link">
+  <link name="${car_name}/base_link">
     <visual name="visual">
       <origin xyz="0.19 0 0.07" rpy="0 0 3.14" />
       <geometry>
@@ -28,7 +31,7 @@
   </link>
 
   <xacro:macro name="wheel" params="prefix suffix x y z pitch yaw">
-    <link name="ego_racecar/${prefix}_${suffix}_wheel">
+    <link name="${car_name}/${prefix}_${suffix}_wheel">
       <visual>
         <origin xyz="${x} ${y} ${z}" rpy="1.5707 ${pitch} ${yaw}" />
         <geometry>
@@ -40,34 +43,31 @@
   </xacro:macro>
 
   <xacro:macro name="front_hinge" params="subfix">
-    <link name="ego_racecar/front_${subfix}_hinge">
+    <link name="${car_name}/front_${subfix}_hinge">
     </link>
   </xacro:macro>
 
   <xacro:macro name="front_hinge_joint" params="subfix x y z">
     <joint name="front_${subfix}_hinge_joint" type="fixed">
-      <!-- <axis xyz="0 0 1" /> -->
-      <parent link="ego_racecar/base_link"/>
-      <child link="ego_racecar/front_${subfix}_hinge"/>
+      <parent link="${car_name}/base_link"/>
+      <child link="${car_name}/front_${subfix}_hinge"/>
       <origin xyz="${x} ${y} ${z}" />
-      <!-- <limit effort="1000.0" lower="-0.4" upper="0.4" velocity="2.0"/> -->
     </joint>
   </xacro:macro>
 
   <xacro:macro name="front_wheel_joint" params="subfix x y z">
     <joint name="front_${subfix}_wheel_joint" type="continuous">
       <axis xyz="0 1 0" />
-      <parent link="ego_racecar/front_${subfix}_hinge"/>
-      <child link="ego_racecar/front_${subfix}_wheel"/>
+      <parent link="${car_name}/front_${subfix}_hinge"/>
+      <child link="${car_name}/front_${subfix}_wheel"/>
       <origin xyz="${x} ${y} ${z}" />
     </joint>
   </xacro:macro>
 
   <xacro:macro name="back_wheel_joint" params="subfix x y z">
     <joint name="back_${subfix}_wheel_joint" type="fixed"> 
-      <!-- <axis xyz="0 1 0" /> -->
-      <parent link="ego_racecar/base_link"/>
-      <child link="ego_racecar/back_${subfix}_wheel"/>
+      <parent link="${car_name}/base_link"/>
+      <child link="${car_name}/back_${subfix}_wheel"/>
       <origin xyz="${x} ${y} ${z}" />
     </joint>
   </xacro:macro>
@@ -80,13 +80,12 @@
   <xacro:front_hinge subfix="right"/>
   <xacro:front_hinge subfix="left"/>
 
-  <xacro:front_hinge_joint subfix="right" x="0.324" y="-0.114" z="0.05"/>
-  <xacro:front_hinge_joint subfix="left" x="0.324" y="0.114" z="0.05"/>
-
+  <xacro:front_hinge_joint subfix="right" x="${wheel_base}" y="${-wheel_track/2}" z="${wheel_radius}"/>
+  <xacro:front_hinge_joint subfix="left" x="${wheel_base}" y="${wheel_track/2}" z="${wheel_radius}"/>
 
   <xacro:front_wheel_joint subfix="right" x="0" y="0" z="0.0"/>
   <xacro:front_wheel_joint subfix="left" x="0." y="0" z="0.0"/>
-  <xacro:back_wheel_joint subfix="right" x="0." y="-0.114" z="0.05"/>
-  <xacro:back_wheel_joint subfix="left" x="0.0" y="0.114" z="0.05"/>
+  <xacro:back_wheel_joint subfix="right" x="0." y="${-wheel_track/2}" z="${wheel_radius}"/>
+  <xacro:back_wheel_joint subfix="left" x="0.0" y="${wheel_track/2}" z="${wheel_radius}"/>
 
 </robot>
