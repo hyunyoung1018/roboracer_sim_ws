@@ -1,16 +1,33 @@
 # roboracer_sim_ws - Python deps that rosdep cannot install.
 #
-# Target: Ubuntu 22.04 / ROS 2 Humble.
+# Target: Ubuntu 22.04 / ROS 2 Humble. See README.md for the full setup order.
 #
-#     pip install -r requirements.txt
+#     pip install --no-deps -r requirements.txt
 #
-# Everything else (numpy, scipy, opencv, scikit-image, yaml, matplotlib) comes
-# from apt via rosdep, declared in each package.xml:
+# --no-deps is REQUIRED, not a shortcut. trajectory_planning_helpers declares
+# `quadprog==0.1.7` and `matplotlib>=3.3.1`; resolving those would
+#   - downgrade quadprog to 0.1.7, whose aarch64 build is broken
+#     (ImportError: undefined symbol: _Z7qpgen2_...), and
+#   - install a pip matplotlib that silently breaks mpl_toolkits (see below).
+# Anything this file needs beyond that is already present from apt or from the
+# vendored f1tenth_gym install.
+#
+# scikit-image, yaml and matplotlib come from apt via rosdep, declared in each
+# package.xml:
 #
 #     rosdep install --from-paths src --ignore-src -y
 #
-# Deliberately unpinned. Humble's system numpy/scipy come from apt, and pinning
-# these packages tends to drag a second, conflicting numpy into the environment.
+# numpy and scipy arrive with the editable f1tenth_gym install (see README).
+#
+# NEVER `pip install matplotlib`. apt's python3-matplotlib ships mpl_toolkits
+# as a REGULAR package (it has an __init__.py), and Python's import rules let a
+# regular package beat a namespace portion found earlier on sys.path. So a pip
+# matplotlib wins for `matplotlib` while apt still wins for `mpl_toolkits`, and
+# you get a new matplotlib paired with an old mpl_toolkits. That combination
+# fails at `from mpl_toolkits.mplot3d import Axes3D` with
+# `cannot import name 'docstring'`, which takes down the whole raceline import
+# chain. Same applies to `pip install --user`.
+#
 # Pin a line only after a version actually breaks, and say why here.
 #
 # Do NOT install the vendored subtree's own requirements file
@@ -20,11 +37,18 @@
 
 # --- Global raceline optimization (raceline package) ---
 # The solvers behind mincurv_iqp and shortest_path.
-trajectory_planning_helpers
+#
+# Pinned (see the "deliberately unpinned" note above - this is the exception it
+# describes). 0.79, the current PyPI release, added spline_len/psi/kappa/dkappa
+# as required arguments to iqp_handler(). The vendored ForzaETH optimizer calls
+# the old signature, so mincurv_iqp dies with a TypeError on anything newer.
+# 0.76 is what the vendored subtree's own requirements.txt targets.
+trajectory_planning_helpers==0.76
 
-# QP backend used by opt_min_curv / iqp_handler. Pulled in by
-# trajectory_planning_helpers, listed explicitly because a missing quadprog
-# fails late, in the middle of an optimization run, rather than at import.
+# QP backend used by opt_min_curv / iqp_handler. Must be listed explicitly:
+# --no-deps means tph's own quadprog dependency is not resolved, and its pin
+# (0.1.7) is a broken build anyway. Left unpinned so pip takes a current
+# release - 0.1.13 is verified working on aarch64.
 quadprog
 
 # --- Optional ---

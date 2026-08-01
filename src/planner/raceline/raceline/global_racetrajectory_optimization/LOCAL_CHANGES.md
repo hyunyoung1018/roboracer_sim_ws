@@ -25,6 +25,24 @@ run. The import now happens inside the `curv_opt_type == 'mintime'` branch, so
 casadi is only needed if mintime is actually used. No behaviour change for the
 optimization types we run.
 
+## 3. `helper_funcs_glob/src/prep_track.py`: `tph.dist_to_p` replaced
+
+scipy >= 1.9 dropped the implicit squeeze that
+`scipy.spatial.distance._validate_vector` used to apply. tph's `dist_to_p`
+passes `splev`'s `(2, 1)` output straight to `distance.euclidean`, which now
+raises `ValueError: Input vector should be 1-D.` inside the `fmin` call in
+`spline_approximation` - so track prep fails before any optimization starts.
+
+Fixed by rebinding `tph.spline_approximation.dist_to_p` to a squeezing
+equivalent at import time in `prep_track.py`, the only consumer. Same distance,
+computed with `np.linalg.norm`.
+
+Not fixed by pinning scipy: this is the one tph call site affected, and
+f1tenth_gym requires scipy >= 1.13. The bug is present in every tph release up
+to 0.79 (the newest on PyPI), so upgrading is not an option either.
+
+Drop this shim if tph ever ships a fix.
+
 ## Not changed, but worth knowing
 
 `helper_funcs_glob/src/prep_track.py` has the spline-normals crossing check

@@ -2,6 +2,20 @@ import numpy as np
 import trajectory_planning_helpers as tph
 import sys
 import matplotlib.pyplot as plt
+from scipy import interpolate
+
+
+# scipy >= 1.9 dropped the implicit squeeze in scipy.spatial.distance's vector
+# validation. tph 0.79's dist_to_p hands it splev's (2, 1) output, which now
+# raises "Input vector should be 1-D." instead of being flattened. 0.79 is the
+# newest tph on PyPI, so patch the module function here rather than pin an
+# older scipy - f1tenth_gym needs scipy >= 1.13. See LOCAL_CHANGES.md.
+def _dist_to_p(t_glob: np.ndarray, path: list, p: np.ndarray) -> float:
+    s = np.squeeze(np.asarray(interpolate.splev(t_glob, path)))
+    return float(np.linalg.norm(np.asarray(p) - s))
+
+
+tph.spline_approximation.dist_to_p = _dist_to_p
 
 
 def prep_track(reftrack_imp: np.ndarray,
