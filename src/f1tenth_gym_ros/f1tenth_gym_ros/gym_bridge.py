@@ -37,7 +37,7 @@ from geometry_msgs.msg import Transform
 from geometry_msgs.msg import Quaternion
 from ackermann_msgs.msg import AckermannDriveStamped
 from tf2_ros import TransformBroadcaster
-from ament_index_python.packages import get_package_share_directory
+from ament_index_python.packages import PackageNotFoundError, get_package_share_directory
 
 import numpy as np
 from PIL import Image
@@ -70,6 +70,7 @@ def _resolve_yaml_path(base_path: pathlib.Path) -> pathlib.Path:
     if base_path.suffix in (".yaml", ".yml"):
         return base_path
     candidates = (
+        base_path / f"{base_path.name}.yaml",  # maps/<map>/<map>.yaml
         base_path.with_suffix(".yaml"),
         base_path.with_suffix(".yml"),
         base_path.parent / f"{base_path.stem}_map.yaml",
@@ -84,7 +85,14 @@ def _resolve_map_yaml_path(map_path: str) -> pathlib.Path | None:
     path = pathlib.Path(map_path)
     if not path.is_absolute():
         share_dir = pathlib.Path(get_package_share_directory("f1tenth_gym_ros"))
-        path = share_dir / map_path
+        candidate = _resolve_yaml_path(share_dir / map_path)
+        if candidate.exists():
+            return candidate
+        # stack_master owns the map folders; maps/<map>/<map>.yaml is the contract.
+        try:
+            path = pathlib.Path(get_package_share_directory("stack_master")) / "maps" / map_path
+        except PackageNotFoundError:
+            return None
     yaml_path = _resolve_yaml_path(path)
     return yaml_path if yaml_path.exists() else None
 

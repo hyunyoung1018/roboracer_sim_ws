@@ -29,13 +29,14 @@ from launch.actions import DeclareLaunchArgument, ExecuteProcess, LogInfo, SetLa
 from launch.conditions import IfCondition, LaunchConfigurationEquals
 from launch.substitutions import Command, LaunchConfiguration
 from launch_ros.actions import Node
-from ament_index_python.packages import get_package_share_directory
+from ament_index_python.packages import PackageNotFoundError, get_package_share_directory
 
 
 def _resolve_yaml_path(base_path: pathlib.Path) -> pathlib.Path:
     if base_path.suffix in ('.yaml', '.yml'):
         return base_path
     candidates = (
+        base_path / f"{base_path.name}.yaml",  # maps/<map>/<map>.yaml
         base_path.with_suffix('.yaml'),
         base_path.with_suffix('.yml'),
         base_path.parent / f"{base_path.stem}_map.yaml",
@@ -51,6 +52,14 @@ def _resolve_map_yaml_path(map_path: str, package_share: str) -> pathlib.Path:
         return _resolve_yaml_path(pathlib.Path(map_path))
     if '/' in map_path or '\\' in map_path:
         return _resolve_yaml_path(pathlib.Path(package_share) / map_path)
+    # stack_master owns the map folders; maps/<map>/<map>.yaml is the contract.
+    try:
+        stack_master_maps = pathlib.Path(get_package_share_directory('stack_master')) / 'maps'
+        candidate = _resolve_yaml_path(stack_master_maps / map_path)
+        if candidate.exists():
+            return candidate
+    except PackageNotFoundError:
+        pass
     try:
         from f1tenth_gym.envs.track.utils import find_track_dir
         track_dir = find_track_dir(map_path)

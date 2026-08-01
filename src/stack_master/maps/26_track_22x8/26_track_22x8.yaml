@@ -1,5 +1,5 @@
 free_thresh: 0.196
-image: 26_track__22x8.png
+image: 26_track_22x8.png
 negate: 0
 occupied_thresh: 0.65
 origin:
