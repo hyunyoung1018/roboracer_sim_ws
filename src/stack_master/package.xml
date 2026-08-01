@@ -21,9 +21,10 @@
   <depend>robot_localization</depend>
   <depend>std_srvs</depend>
 
-  <exec_depend>controller</exec_depend>
-  <exec_depend>pitwall</exec_depend>
-  <exec_depend>odom_calib</exec_depend>
+  <!-- Not ported yet; re-add when the package lands. An exec_depend on a
+       package that does not exist makes `rosdep install` fail for the whole
+       workspace, not just this package. -->
+  <!-- <exec_depend>controller</exec_depend> -->
   <exec_depend>vesc_driver</exec_depend>
   <exec_depend>urg_node</exec_depend>
   <exec_depend>tf2_ros</exec_depend>
