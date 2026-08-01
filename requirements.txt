@@ -1,0 +1,34 @@
+# roboracer_sim_ws - Python deps that rosdep cannot install.
+#
+# Target: Ubuntu 22.04 / ROS 2 Humble.
+#
+#     pip install -r requirements.txt
+#
+# Everything else (numpy, scipy, opencv, scikit-image, yaml, matplotlib) comes
+# from apt via rosdep, declared in each package.xml:
+#
+#     rosdep install --from-paths src --ignore-src -y
+#
+# Deliberately unpinned. Humble's system numpy/scipy come from apt, and pinning
+# these packages tends to drag a second, conflicting numpy into the environment.
+# Pin a line only after a version actually breaks, and say why here.
+#
+# Do NOT install the vendored subtree's own requirements file
+# (src/planner/raceline/raceline/global_racetrajectory_optimization/requirements.txt).
+# It pins numpy==1.18.1 / matplotlib==3.3.1 from 2020 and will fight the system
+# packages. Its real content is reproduced below at working versions.
+
+# --- Global raceline optimization (raceline package) ---
+# The solvers behind mincurv_iqp and shortest_path.
+trajectory_planning_helpers
+
+# QP backend used by opt_min_curv / iqp_handler. Pulled in by
+# trajectory_planning_helpers, listed explicitly because a missing quadprog
+# fails late, in the middle of an optimization run, rather than at import.
+quadprog
+
+# --- Optional ---
+# casadi is only needed for the 'mintime' optimization, which the raceline
+# package never runs (see raceline/optimizer notes and the vendored
+# LOCAL_CHANGES.md). Uncomment if you wire mintime up.
+# casadi

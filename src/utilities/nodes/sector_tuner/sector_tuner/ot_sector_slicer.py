@@ -3,18 +3,12 @@ import rclpy
 from rclpy.node import Node
 from f110_msgs.msg import WpntArray
 import numpy as np
-from ament_index_python.packages import get_package_share_directory
-from pathlib import Path
 from visualization_msgs.msg import MarkerArray
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider, Button
 from matplotlib.patches import Arrow
 
-def get_data_path(subpath=''):
-    """
-    Helper function to get an absolute path to the specified (relative) path within the data folder.
-    """
-    return Path(get_package_share_directory('stack_master')).parents[3]/'src/race_stack/stack_master'/subpath
+from .paths import resolve_source_dir
 
 class OvertakingSectorSlicer(Node):
     """
@@ -24,7 +18,13 @@ class OvertakingSectorSlicer(Node):
         super().__init__('ot_sector_slicer',
                          allow_undeclared_parameters=True,
                          automatically_declare_parameters_from_overrides=False)
-        self.declare_parameter('map_name','hangar_1905_v0')
+        # Directory the yaml is written to - the map folder. Filename is always
+        # ot_sectors.yaml.
+        self.declare_parameter('save_dir', '')
+        # Rebuild stack_master after writing. Needed the first time a map gets
+        # sectors, because a brand new yaml has no symlink in the install tree
+        # yet and would stay invisible to ros2 until the next build.
+        self.declare_parameter('rebuild_on_save', True)
         self.future = future
         
         self.glb_wpnts = None
@@ -41,9 +41,13 @@ class OvertakingSectorSlicer(Node):
         timer_period = 0.5  # seconds
         self.timer = self.create_timer(timer_period, self.timer_callback)
 
-        #rosparam to define yaml dir but filename will always be speed_scaling.yaml
-        map_name = self.get_parameter('map_name').get_parameter_value().string_value
-        self.yaml_dir = get_data_path('maps/'+map_name)
+        self.yaml_dir = resolve_source_dir(
+            self.get_parameter('save_dir').get_parameter_value().string_value)
+        self.rebuild_on_save = self.get_parameter('rebuild_on_save').value
+        if not self.yaml_dir:
+            self.get_logger().error('save_dir parameter is required')
+            raise RuntimeError('save_dir parameter is required')
+        self.get_logger().info(f'Overtaking sectors will be written to {self.yaml_dir}')
         self.get_logger().info('Waiting for global waypoints...')
     
     def glb_wpnts_cb(self, data):
@@ -168,15 +172,18 @@ class OvertakingSectorSlicer(Node):
             dict_file['Overtaking_sector' + str(i)].update({'ot_flag': False})
         ros_yaml_preamble = {'ot_interpolator': {'ros__parameters': dict_file}}
         
-        #Save yaml to the respective maps folder 
+        #Save yaml to the respective maps folder
+        os.makedirs(self.yaml_dir, exist_ok=True)
         yaml_path = os.path.join(self.yaml_dir, 'ot_sectors.yaml')
         with open(yaml_path, 'w') as file:
             self.get_logger().info('Dumping to {}: {}'.format(yaml_path, ros_yaml_preamble))
             yaml.dump(ros_yaml_preamble, file, sort_keys=False)
 
-        # Directly build the stack_master package
-        self.get_logger().info('Writing yaml file and invoking colcon build on stack_master package to install the yaml config for the next use.')
-        subprocess.Popen("ros2 run sector_tuner finish_sector.sh", shell=True) 
+        if self.rebuild_on_save:
+            # NOTE: sector_slicer does the same thing. See the note there about
+            # the two colcon builds colliding.
+            self.get_logger().info('Invoking colcon build on stack_master so the new yaml is installed.')
+            subprocess.Popen("ros2 run sector_tuner finish_sector.sh", shell=True)
 
 
 def main():
