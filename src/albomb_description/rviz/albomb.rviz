@@ -3,7 +3,8 @@ Panels:
     Help Height: 78
     Name: Displays
     Property Tree Widget:
-      Expanded: ~
+      Expanded:
+        - /Global Options1
       Splitter Ratio: 0.6529411673545837
     Tree Height: 562
   - Class: rviz_common/Selection
@@ -63,49 +64,45 @@ Visualization Manager:
         Expand Link Details: false
         Expand Tree: false
         Link Tree Style: Links in Alphabetic Order
-        base_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        chassis:
+        ego_racecar/back_left_wheel:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        imu_link:
+        ego_racecar/back_right_wheel:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        laser_link:
+        ego_racecar/base_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        left_back_wheel:
+        ego_racecar/front_left_hinge:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        ego_racecar/front_left_wheel:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        left_front_axel:
+        ego_racecar/front_right_hinge:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        left_front_wheel:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        right_back_wheel:
+        ego_racecar/front_right_wheel:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        right_front_axel:
+        ego_racecar/imu:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        right_front_wheel:
+          Value: true
+        ego_racecar/laser:
           Alpha: 1
           Show Axes: false
           Show Trail: false
@@ -123,25 +120,23 @@ Visualization Manager:
       Frame Timeout: 15
       Frames:
         All Enabled: true
-        base_link:
+        ego_racecar/back_left_wheel:
           Value: true
-        chassis:
+        ego_racecar/back_right_wheel:
           Value: true
-        imu_link:
+        ego_racecar/base_link:
           Value: true
-        laser_link:
+        ego_racecar/front_left_hinge:
           Value: true
-        left_back_wheel:
+        ego_racecar/front_left_wheel:
           Value: true
-        left_front_axel:
+        ego_racecar/front_right_hinge:
           Value: true
-        left_front_wheel:
+        ego_racecar/front_right_wheel:
           Value: true
-        right_back_wheel:
+        ego_racecar/imu:
           Value: true
-        right_front_axel:
-          Value: true
-        right_front_wheel:
+        ego_racecar/laser:
           Value: true
       Marker Scale: 0.5
       Name: TF
@@ -149,28 +144,27 @@ Visualization Manager:
       Show Axes: true
       Show Names: false
       Tree:
-        base_link:
-          chassis:
-            imu_link:
+        ego_racecar/base_link:
+          ego_racecar/back_left_wheel:
+            {}
+          ego_racecar/back_right_wheel:
+            {}
+          ego_racecar/front_left_hinge:
+            ego_racecar/front_left_wheel:
               {}
-            laser_link:
+          ego_racecar/front_right_hinge:
+            ego_racecar/front_right_wheel:
               {}
-            left_back_wheel:
-              {}
-            left_front_axel:
-              left_front_wheel:
-                {}
-            right_back_wheel:
-              {}
-            right_front_axel:
-              right_front_wheel:
-                {}
+          ego_racecar/imu:
+            {}
+          ego_racecar/laser:
+            {}
       Update Interval: 0
       Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
-    Fixed Frame: base_link
+    Fixed Frame: ego_racecar/base_link
     Frame Rate: 30
   Name: root
   Tools:
