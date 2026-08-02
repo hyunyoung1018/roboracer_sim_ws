@@ -46,10 +46,21 @@
 trajectory_planning_helpers==0.76
 
 # QP backend used by opt_min_curv / iqp_handler. Must be listed explicitly:
-# --no-deps means tph's own quadprog dependency is not resolved, and its pin
-# (0.1.7) is a broken build anyway. Left unpinned so pip takes a current
-# release - 0.1.13 is verified working on aarch64.
-quadprog
+# --no-deps means tph's own quadprog dependency is not resolved.
+#
+# The lower bound is load-bearing, and it is not about features. The venv is
+# created with --system-site-packages, so pip counts anything in ~/.local or
+# /usr/lib/python3/dist-packages as already installed and skips it. Unpinned,
+# `quadprog` is satisfied by whatever is already on the system - including
+# tph's own 0.1.7, whose aarch64 wheel fails at import with
+#   ImportError: undefined symbol: _Z7qpgen2_...
+# pip then installs nothing, the venv gets no quadprog of its own, and the
+# raceline node dies on import. RViz still comes up, so it looks like clicks
+# are being ignored rather than like a crash.
+#
+# 0.1.13 is verified working on aarch64. Keep a lower bound on anything added
+# here that a stale user-site install could shadow.
+quadprog>=0.1.13
 
 # --- Optional ---
 # casadi is only needed for the 'mintime' optimization, which the raceline
