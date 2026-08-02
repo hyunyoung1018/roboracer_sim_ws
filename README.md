@@ -1,9 +1,7 @@
 # roboracer_unita_ws
 
 F1TENTH / RoboRacer 2026 stack, built on
-[ForzaETH race_stack](https://github.com/ForzaETH/race_stack), with the global
-optimizer from ForzaETH's fork of TUM FTM's `global_racetrajectory_optimization`
-vendored under `planner/raceline/`.
+[ForzaETH race_stack](https://github.com/ForzaETH/race_stack).
 
 ---
 
