@@ -59,14 +59,43 @@ This installs the apt side: `nav2_map_server`, `foxglove_bridge`, `rviz2`,
 ### 4. The vendored f1tenth_gym
 
 The simulator is vendored as a subtree and is **not** installed by
-`requirements.txt`. Install it editable, with dependencies:
+`requirements.txt`. Install it without dependency resolution, then install the
+dependencies it actually uses:
 
 ```bash
-pip install -e src/f1tenth_gym_ros/f1tenth_gym
+pip install -e src/f1tenth_gym_ros/f1tenth_gym --no-deps
+pip install gymnasium numba pandas pillow requests "scipy>=1.13" yamldataclassconfig
 ```
 
-This is what brings `numpy`, `scipy`, `gymnasium` and `numba` into the venv. Do
-this **before** step 5.
+Do this **before** step 5.
+
+`--no-deps` on the first line skips the gym's rendering stack — `pyqt6`,
+`pyqtgraph`, `PyOpenGL`, `PyOpenGL-accelerate` — which this workspace never
+loads. The second line resolves normally, so the real dependencies still bring
+their own transitive requirements.
+
+Skipping the renderer is not just an optimisation on arm64, where it does not
+build at all (see *Architecture notes*). Nothing here can reach it: `gym_bridge.py` builds
+the environment with `render_enabled=False`, and `F110Env` only calls
+`make_renderer()` — the sole place PyQt6 is imported — when that flag is set.
+Visualisation is RViz and Foxglove.
+
+The second line is every third-party module the gym imports outside
+`envs/rendering/`, minus `numpy`, `opencv-python` and `PyYAML`, which step 3
+already installed from apt. `scipy` is in the list despite also coming from apt:
+22.04 ships 1.8.0 and the gym needs `>=1.13`, so pip has to shadow it. The list
+was derived by reading the imports, so if something still surfaces at runtime,
+add it here.
+
+If you specifically want the gym's own renderer — for standalone (non-ROS) use
+of the simulator — install it separately on x86_64:
+
+```bash
+pip install "pyqt6>=6.7.1,<7" "pyqtgraph>=0.13.7,<0.14" "PyOpenGL>=3.1.9" "PyOpenGL-accelerate>=3.1.9"
+```
+
+On arm64 that will try to compile PyQt6 from source; see *Architecture notes*
+before you do.
 
 ### 5. Python dependencies
 
@@ -91,6 +120,7 @@ source install/setup.bash
 ### 7. Verify
 
 ```bash
+python -c "from f1tenth_gym.envs import F110Env; print('gym OK')"
 ros2 launch f1tenth_gym_ros unita_gym_bridge_launch.py
 ```
 
@@ -155,6 +185,42 @@ Useful arguments:
 | `sectors` | `true` | `false` to redo only the raceline |
 | `rviz` | `true` | |
 | `safety_width` | `0.7` | use `0.45` on `26_inu_track_6x12`, which is only 0.9 m wide |
+
+---
+
+## Architecture notes
+
+The setup above is identical on x86_64 and arm64. This section records where the
+two platforms actually differ, so an error on one is recognisable as such.
+
+### arm64 (Apple Silicon under UTM/Parallels, Jetson, Raspberry Pi)
+
+**PyQt6 has no arm64 wheel on PyPI.** Anything that resolves `pyqt6` — which is
+what step 4 would do without `--no-deps` — falls back to the source
+distribution, and the build fails before it even starts compiling:
+
+```
+ModuleNotFoundError: No module named 'packaging.licenses'
+```
+
+`packaging.licenses` was added in packaging 24.2, and pip's build-isolation
+environment gets an older one because Ubuntu 22.04 ships pip 22.0.2, which
+cannot use current `packaging` wheels.
+
+Upgrading pip clears that error but is the wrong fix: the next step compiles
+PyQt6 from source, which needs the Qt6 development headers and takes a long time
+on an emulated arm64 VM, to produce a library nothing here loads. Follow step 4
+as written instead.
+
+The same "no arm64 wheel" pattern affects `quadprog==0.1.7`, whose arm64 build
+imports with `undefined symbol: _Z7qpgen2_...`. That is why `requirements.txt`
+leaves `quadprog` unpinned and why `--no-deps` is mandatory there — see step 5.
+
+### x86_64
+
+No known differences. Wheels exist for everything, so a full
+`pip install -e src/f1tenth_gym_ros/f1tenth_gym` would also succeed — it just
+pulls in the renderer this workspace never loads.
 
 ---
 
