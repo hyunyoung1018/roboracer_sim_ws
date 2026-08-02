@@ -1,0 +1,4 @@
+[submodule "src/sensor/urg_node"]
+	path = src/sensor/urg_node
+	url = https://github.com/ros-drivers/urg_node.git
+	branch = ros2-devel
