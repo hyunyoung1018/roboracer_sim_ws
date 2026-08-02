@@ -15,12 +15,18 @@
   also what supplies the robot description and the teleop you drive with. Pass
   hardware:=false if they are already running from another terminal.
 
-  Data path (see CLAUDE.md "State estimation" and config/common/mapping_2d.lua):
+  Data path (see config/common/mapping_2d.lua for the reasoning):
 
-      VESC odom + VESC IMU -> EKF -> /early_fusion/odom -> cartographer
-                                     LiDAR /scan        -> cartographer
-      cartographer owns TF (map -> ego_racecar/base_link); the EKF never
-      publishes TF.
+      VESC IMU  /vesc/sensors/imu/raw -> cartographer
+      LiDAR     /scan                 -> cartographer
+      cartographer owns TF: map -> ego_racecar/base_link
+
+  There is no wheel odometry and no EKF here. The VESC is sensorless, so its
+  speed is unreliable exactly at the slow, tight-turning pace mapping is driven
+  at, and its yaw is dead-reckoned from the servo command rather than measured.
+  The IMU is the motion prior instead - which makes the vesc_driver IMU fixes
+  (frame_id, and the g / deg-per-second conversions) a prerequisite, not a
+  nicety: without them cartographer has no usable prior at all.
 
   There is no `sim` argument. mapping_2d.lua is written for the real car, and
   the gym bridge already publishes its own odom and TF, which would fight
@@ -39,21 +45,13 @@
   <let name="maps_dir" value="$(find-pkg-share stack_master)/maps"/>
 
   <!-- ===== drivers, teleop, robot description ===== -->
-  <!-- Cartographer needs TF from tracking_frame (ego_racecar/base_link) to the
-       laser frame to place scans; that comes from albomb's URDF, published by
-       hardware.launch.xml along with the drivers. -->
+  <!-- Cartographer resolves both the laser and the IMU against its
+       tracking_frame (ego_racecar/imu), and publishes onto
+       ego_racecar/base_link. All three links come from albomb's URDF, which
+       hardware.launch.xml publishes along with the drivers. -->
   <group if="$(var hardware)">
     <include file="$(find-pkg-share stack_master)/launch/hardware.launch.xml"/>
   </group>
-
-  <!-- ===== early fusion: VESC odom + IMU -> /early_fusion/odom ===== -->
-  <!-- Node name must stay ekf_filter_node: that is the key ekf.yaml is written
-       under. publish_tf is false in that file - cartographer owns TF. -->
-  <node pkg="robot_localization" exec="ekf_node" name="ekf_filter_node" output="screen">
-    <param from="$(var config_dir)/common/ekf.yaml"/>
-    <param name="use_sim_time" value="$(var use_sim_time)"/>
-    <remap from="/odometry/filtered" to="/early_fusion/odom"/>
-  </node>
 
   <!-- ===== cartographer ===== -->
   <!-- The minloglevel argument keeps glog's per-scan chatter out of the way;
@@ -66,7 +64,9 @@
               -configuration_basename mapping_2d.lua
               --minloglevel 2">
     <param name="use_sim_time" value="$(var use_sim_time)"/>
-    <remap from="odom" to="/early_fusion/odom"/>
+    <!-- The sensor_msgs/Imu output, not the VESC-native vesc_msgs one on
+         /vesc/sensors/imu. No odom remap: use_odometry is false. -->
+    <remap from="imu" to="/vesc/sensors/imu/raw"/>
   </node>
 
   <node pkg="cartographer_ros" exec="cartographer_occupancy_grid_node"

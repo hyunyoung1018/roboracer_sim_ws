@@ -1,11 +1,18 @@
-# robot_localization EKF - "early fusion" stage, upstream of cartographer.
+# robot_localization EKF - currently UNUSED by any launch file.
+#
+# It was the "early fusion" stage feeding cartographer wheel odometry blended
+# with IMU. Mapping now runs on LiDAR + IMU alone (see mapping_2d.lua for why
+# the sensorless VESC odometry was dropped), so nothing consumes this.
+#
+# Kept because racing-time localisation will likely want it: fusing the particle
+# filter's pose with the IMU is the same shape of problem. Re-check the topic
+# names and frames before wiring it up again.
 #
 # Based on ForzaETH race_stack (state_estimation/config/ekf.yaml), with frames
 # adapted to albomb_description (car_name = ego_racecar).
 #
-# Fuses VESC wheel odometry (yaw, vx) + VESC IMU (yaw, vyaw) into
-# /early_fusion/odom, which cartographer consumes as its `odom` input.
-# publish_tf is FALSE: this node never touches TF. Cartographer owns map->base_link.
+# Fuses VESC wheel odometry (yaw, vx) + VESC IMU (yaw, vyaw) into a filtered
+# odometry topic. publish_tf is FALSE: this node never touches TF.
 
 ekf_filter_node:
   ros__parameters:
@@ -48,10 +55,8 @@ ekf_filter_node:
     odom0_relative: false
 
     # --- VESC IMU ------------------------------------------------------------
-    # NOTE: vesc_driver does not set header.frame_id on this message (it is
-    # published empty). robot_localization looks up TF by frame_id, so until the
-    # driver is patched to stamp "ego_racecar/imu", these measurements are
-    # silently dropped. Fix before the first real-car run.
+    # Units and frame_id are handled in vesc_driver, which is patched locally -
+    # upstream published g / deg per second with an empty frame_id.
     imu0: /vesc/sensors/imu/raw
     imu0_config: [false, false, false,
                   false, false, true,

@@ -55,8 +55,8 @@ vesc_to_odom_node:
     publish_tf: false
 
     # Yaw is integrated from the SERVO COMMAND through a bicycle model, not
-    # measured. That is why this odometry is only ever a scan-matcher hint and
-    # is weighted out of the pose graph - see CLAUDE.md.
+    # measured. Together with the sensorless speed estimate that is why
+    # mapping ignores this odometry entirely - see config/common/mapping_2d.lua.
     use_servo_cmd_to_calc_angular_velocity: true
 
     # From albomb_description/urdf/albomb_core.xacro (wheel_base).

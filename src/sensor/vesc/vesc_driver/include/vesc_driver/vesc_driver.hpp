@@ -103,6 +103,14 @@ private:
   rclcpp::SubscriptionBase::SharedPtr position_sub_;
   rclcpp::SubscriptionBase::SharedPtr servo_sub_;
   rclcpp::TimerBase::SharedPtr timer_;
+  // Separate from timer_: the IMU is the only motion prior cartographer gets
+  // while mapping, so it is polled faster than the telemetry state machine.
+  rclcpp::TimerBase::SharedPtr imu_timer_;
+
+  // Frame the IMU messages are stamped with. Anything that transforms them -
+  // robot_localization, cartographer - looks the frame up in TF, and an empty
+  // frame_id makes that lookup fail silently.
+  std::string imu_frame_id_;
 
   // driver modes (possible states)
   typedef enum
@@ -125,6 +133,7 @@ private:
   void servoCallback(const Float64::SharedPtr servo);
   void speedCallback(const Float64::SharedPtr speed);
   void timerCallback();
+  void imuTimerCallback();
 };
 
 }  // namespace vesc_driver

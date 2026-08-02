@@ -105,6 +105,27 @@ VescDriver::VescDriver(const rclcpp::NodeOptions & options)
 
   // create a 50Hz timer, used for state machine & polling VESC telemetry
   timer_ = create_wall_timer(20ms, std::bind(&VescDriver::timerCallback, this));
+
+  // The IMU gets its own, faster timer. Sharing the 50 Hz telemetry timer caps
+  // the IMU at the rate the state machine happens to run at, and while mapping
+  // the IMU is the only motion prior cartographer has - its rate sets how well
+  // rotation is extrapolated between scans.
+  imu_frame_id_ = declare_parameter("imu_frame_id", std::string("ego_racecar/imu"));
+  imu_timer_ = create_wall_timer(10ms, std::bind(&VescDriver::imuTimerCallback, this));
+}
+
+void VescDriver::imuTimerCallback()
+{
+  if (!vesc_.isConnected()) {
+    // timerCallback() owns the disconnect handling and the shutdown.
+    return;
+  }
+
+  // Only once the firmware handshake in timerCallback() has flipped the mode;
+  // polling before that interleaves with the version request.
+  if (driver_mode_ == MODE_OPERATING) {
+    vesc_.requestImuData();
+  }
 }
 
 /* TODO or TO-THINKABOUT LIST
@@ -144,10 +165,9 @@ void VescDriver::timerCallback()
       driver_mode_ = MODE_OPERATING;
     }
   } else if (driver_mode_ == MODE_OPERATING) {
-    // poll for vesc state (telemetry)
+    // poll for vesc state (telemetry). The IMU is polled separately, faster,
+    // in imuTimerCallback().
     vesc_.requestState();
-    // poll for vesc imu
-    vesc_.requestImuData();
   } else {
     // unknown mode, how did that happen?
     assert(false && "unknown driver mode");
@@ -210,6 +230,13 @@ void VescDriver::vescPacketCallback(const std::shared_ptr<VescPacket const> & pa
     imu_msg.header.stamp = now();
     std_imu_msg.header.stamp = now();
 
+    // Upstream leaves frame_id empty. Every consumer resolves the IMU through
+    // TF - robot_localization's lookup, and cartographer's colocation check on
+    // frame_id -> tracking_frame - and an empty frame is not a lookup failure
+    // they report loudly: the samples are simply dropped.
+    imu_msg.header.frame_id = imu_frame_id_;
+    std_imu_msg.header.frame_id = imu_frame_id_;
+
     imu_msg.imu.ypr.x = imuData->roll();
     imu_msg.imu.ypr.y = imuData->pitch();
     imu_msg.imu.ypr.z = imuData->yaw();
@@ -231,13 +258,27 @@ void VescDriver::vescPacketCallback(const std::shared_ptr<VescPacket const> & pa
     imu_msg.imu.orientation.y = imuData->q_y();
     imu_msg.imu.orientation.z = imuData->q_z();
 
-    std_imu_msg.linear_acceleration.x = imuData->acc_x();
-    std_imu_msg.linear_acceleration.y = imuData->acc_y();
-    std_imu_msg.linear_acceleration.z = imuData->acc_z();
+    // UNIT CONVERSION - required, not cosmetic.
+    //
+    // The VESC reports acceleration in g and angular velocity in deg/s (see the
+    // comments on VescPacketImu::acc_x() / gyr_x() in vesc_packet.cpp).
+    // sensor_msgs/Imu specifies m/s^2 and rad/s. Upstream assigns the raw
+    // values straight across, so acceleration comes out 9.8x too small and
+    // angular velocity 57x too large - which no consumer can detect, they just
+    // integrate nonsense.
+    //
+    // vesc_msgs/VescImuStamped above keeps the VESC-native units on purpose;
+    // only the sensor_msgs/Imu copy is converted.
+    constexpr double kGravity = 9.80665;      // [m/s^2] per g
+    constexpr double kDegToRad = M_PI / 180.0;
 
-    std_imu_msg.angular_velocity.x = imuData->gyr_x();
-    std_imu_msg.angular_velocity.y = imuData->gyr_y();
-    std_imu_msg.angular_velocity.z = imuData->gyr_z();
+    std_imu_msg.linear_acceleration.x = imuData->acc_x() * kGravity;
+    std_imu_msg.linear_acceleration.y = imuData->acc_y() * kGravity;
+    std_imu_msg.linear_acceleration.z = imuData->acc_z() * kGravity;
+
+    std_imu_msg.angular_velocity.x = imuData->gyr_x() * kDegToRad;
+    std_imu_msg.angular_velocity.y = imuData->gyr_y() * kDegToRad;
+    std_imu_msg.angular_velocity.z = imuData->gyr_z() * kDegToRad;
 
     std_imu_msg.orientation.w = imuData->q_w();
     std_imu_msg.orientation.x = imuData->q_x();
