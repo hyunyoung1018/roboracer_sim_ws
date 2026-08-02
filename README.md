@@ -1,4 +1,4 @@
-# roboracer_sim_ws
+# roboracer_unita_ws
 
 F1TENTH / RoboRacer 2026 stack, built on [ForzaETH race_stack](https://github.com/ForzaETH/race_stack)
 with the global optimizer subtree from ForzaETH's fork of TUM FTM's
@@ -26,8 +26,8 @@ sudo apt install python3-venv python3-pip
 ### 1. Clone
 
 ```bash
-git clone https://github.com/hyunyoung1018/roboracer_sim_ws.git
-cd roboracer_sim_ws
+git clone https://github.com/hyunyoung1018/roboracer_unita_ws.git
+cd roboracer_unita_ws
 ```
 
 **Pick the final location now.** A venv records absolute paths in

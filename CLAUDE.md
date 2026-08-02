@@ -1,4 +1,4 @@
-# roboracer_sim_ws
+# roboracer_unita_ws
 
 F1TENTH / RoboRacer 2026 stack. Built on **ForzaETH race_stack** (ETH Zurich) —
 that lineage is intentional and should stay visible in naming and structure.
@@ -15,8 +15,9 @@ take it from race_stack instead.
   ROS 2 Humble** in UTM. Do not assume a command can be executed locally.
 - Car is `albomb`. TF frames use `ego_racecar/*` so sim and real share one set
   of frames with no remapping — this is deliberate, don't "fix" it.
-- `pip install -r requirements.txt`, then `rosdep install --from-paths src`.
-  Never install the vendored subtree's own requirements.txt (2020-era pins).
+- Setup order and the traps are in `README.md`. Both pip steps need `--no-deps`
+  and neither is optional — see the file for why. Never install the vendored
+  subtree's own requirements.txt (2020-era pins).
 
 ## Pipeline: three launch files, not one node with mode flags
 
@@ -86,8 +87,11 @@ yaw is dead-reckoned from the servo command, so it must never sit in the TF path
 
 ## Known rough edges
 
-- The optimization has **never been run end to end** — only import paths were
-  verified. Expect the first Ubuntu run to surface problems here.
+- The optimization runs end to end (verified on `26_track_22x8`: IQP converged
+  in 22 iterations to 0.0197 rad/m, 6.79 s estimated lap time). Getting there
+  needed two third-party fixes, both recorded — the `tph` 0.76 pin in
+  `requirements.txt` and the scipy shim in `LOCAL_CHANGES.md`. Do not bump
+  either without re-running a full generation.
 - `26_inu_track_6x12` is only 0.9 m wide. Default `safety_width: 0.7` leaves
   ±0.10 m; use `safety_width:=0.45` on that map.
 - The spline-normals crossing check is commented out upstream by ForzaETH. With

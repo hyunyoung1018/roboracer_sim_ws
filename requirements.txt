@@ -1,4 +1,4 @@
-# roboracer_sim_ws - Python deps that rosdep cannot install.
+# roboracer_unita_ws - Python deps that rosdep cannot install.
 #
 # Target: Ubuntu 22.04 / ROS 2 Humble. See README.md for the full setup order.
 #
