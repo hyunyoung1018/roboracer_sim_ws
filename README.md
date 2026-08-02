@@ -26,8 +26,18 @@ sudo apt install python3-venv python3-pip
 ### 1. Clone
 
 ```bash
-git clone https://github.com/hyunyoung1018/roboracer_unita_ws.git
+git clone --recurse-submodules https://github.com/hyunyoung1018/roboracer_unita_ws.git
 cd roboracer_unita_ws
+```
+
+`--recurse-submodules` matters: the Hokuyo driver `src/sensor/urg_node` is a
+submodule pinned to `ros-drivers/urg_node`. Clone without it and that directory
+is empty, `colcon` silently builds one package fewer, and there is no `/scan` on
+the car — which only shows up much later, at mapping. If you already cloned
+without it:
+
+```bash
+git submodule update --init
 ```
 
 **Pick the final location now.** A venv records absolute paths in
@@ -133,6 +143,14 @@ detail; the short version is that `trajectory_planning_helpers` declares
 `quadprog==0.1.7` (a broken build on aarch64) and `matplotlib>=3.3.1` (which
 breaks `mpl_toolkits` — see *Gotchas*).
 
+Every entry in `requirements.txt` carries a version bound, and that is
+deliberate. Because the venv is created with `--system-site-packages`, pip
+treats anything already present in `~/.local` or `/usr/lib/python3/dist-packages`
+as satisfying a requirement. An *unpinned* entry therefore resolves to whatever
+happens to be on the machine already, pip reports
+`Requirement already satisfied`, and nothing is installed into the venv — even
+if the version it found is broken. Keep the bounds when adding a line.
+
 ### 6. Build
 
 ```bash
@@ -144,8 +162,18 @@ source install/setup.bash
 
 ### 7. Verify
 
+Check both import chains before launching anything. The raceline one pulls in
+`trajectory_planning_helpers`, `quadprog`, `scipy` and `skimage`, so it is what
+catches a dependency that silently failed to install:
+
 ```bash
 python -c "from f1tenth_gym.envs import F110Env; print('gym OK')"
+python -c "from raceline.raceline_generator import trajectory_optimizer; print('raceline OK')"
+```
+
+Then:
+
+```bash
 ros2 launch f1tenth_gym_ros unita_gym_bridge_launch.py
 ```
 
@@ -183,6 +211,46 @@ downloading a track from `api.f1tenth.org`, so a typo shows up as a network
 fetch rather than a clean error.
 
 Foxglove opens automatically; `open_foxglove:=false` suppresses it.
+
+### Mapping
+
+Builds a new map with cartographer SLAM. **Real car only** — it needs a LiDAR
+and the VESC.
+
+Bring the sensor drivers up first: this launch does not start them, and expects
+`/scan`, `/vesc/odom` and `/vesc/sensors/imu/raw` to be publishing already,
+plus some way to drive the car. (`hardware.launch.xml` is not written yet.)
+
+```bash
+ros2 launch stack_master mapping.launch.xml map:=<new_map_name>
+```
+
+Drive the whole track, watching the grid fill in in RViz. When it looks right,
+from a second terminal:
+
+```bash
+ros2 service call /finish_mapping std_srvs/srv/Trigger {}
+```
+
+That writes `<map>.pbstream`, `<map>.png` and `<map>.yaml` into
+`stack_master/maps/<map>/` — resolved back to `src/`, not the install tree — and
+prints the raceline command to run next.
+
+If it answers `No message has arrived on /map`, nothing has been committed and
+you can keep driving; cartographer is not receiving usable scans. Check TF from
+`ego_racecar/base_link` to the laser frame. The refusal is deliberate:
+`/finish_trajectory` is irreversible, so it is checked *before* being called
+rather than after.
+
+| Argument | Default | Notes |
+|---|---|---|
+| `map` | required | folder to create under `stack_master/maps/` |
+| `rviz` | `true` | |
+| `resolution` | `0.05` | m/cell; the raceline stage assumes 0.05 |
+
+There is no `sim` option. `mapping_2d.lua` is written for the real car, and the
+gym bridge publishes its own odom and TF, which would fight cartographer for
+`map -> base_link`.
 
 ### Raceline generation
 
@@ -313,6 +381,29 @@ grep -rl "/old/path" .venv/ | xargs sed -i 's|/old/path|/new/path|g'
 
 That works because the venv's `python` is a symlink to the system interpreter
 and `pyvenv.cfg` points at `/usr/bin`; only the recorded paths are stale.
+
+### A node died on import, but a GUI is still up
+
+When a launch starts both a node and a viewer, a node that dies at import leaves
+the viewer running and responsive — so it reads as "the GUI is ignoring me"
+rather than as a crash. This has bitten twice: RViz's *2D Pose Estimate* doing
+nothing during raceline generation, and it applies equally to `finish_mapping`.
+
+Check, rather than guess:
+
+```bash
+ros2 node list                    # is the node even there?
+ros2 topic info /initialpose      # Subscription count: 0  ->  the node is gone
+```
+
+The traceback is near the top of the launch output, above the viewer and
+map_server chatter. Step 7's import checks are the quicker way to see the same
+thing.
+
+For raceline specifically: if the subscription *is* there and clicking still
+does nothing, look for `Start pose from .../track_meta.yaml` in the log — the
+node only waits when the map has no saved start pose, and reuses the old one
+otherwise. Delete `track_meta.yaml` to be asked again.
 
 ### `rosdep` and packages that do not exist yet
 
