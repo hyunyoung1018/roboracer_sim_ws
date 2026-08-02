@@ -188,12 +188,48 @@ Useful arguments:
 
 ---
 
-## Architecture notes
+## Where this runs
 
-The setup above is identical on x86_64 and arm64. This section records where the
-two platforms actually differ, so an error on one is recognisable as such.
+Two targets, and they need different amounts of this workspace.
 
-### arm64 (Apple Silicon under UTM/Parallels, Jetson, Raspberry Pi)
+### Development machine — full install
+
+The setup above. Simulator, raceline generation, sector tuning, RViz. Both
+architectures work and the steps are identical; the arm64 notes below apply if
+you are on Apple Silicon under UTM/Parallels.
+
+### The car — Jetson Orin Nano Super
+
+**arm64, JetPack 6 (Ubuntu 22.04), so ROS 2 Humble is a native fit** and the
+same instructions apply. But the car does not run raceline generation. That is
+an offline step: generate on the laptop, commit `global_waypoints.json` and the
+sector yamls with the map, and the car only reads them.
+
+So on the Jetson you can skip:
+
+| Skip | Why |
+|---|---|
+| `pip install --no-deps -r requirements.txt` | `trajectory_planning_helpers` and `quadprog` are the optimizer's solvers |
+| the vendored `f1tenth_gym` (step 4) | the simulator never runs on the car |
+| `raceline_generator`, `sector_slicer`, `ot_sector_slicer` | offline tools; they open matplotlib GUIs |
+
+`raceline_publisher` is the only node from the `raceline` package that runs
+while racing, and it imports nothing outside ROS — no OpenCV, no numpy, no
+`trajectory_planning_helpers`. Keep it that way: it is the reason `paths.py`
+exists separately from `map_io.py`.
+
+**Caveat:** `raceline/package.xml` still declares `python3-skimage`,
+`python3-opencv` and `python3-matplotlib`, because the generator lives in the
+same package. `rosdep install` on the Jetson therefore pulls them in even though
+the publisher never touches them. Splitting the package in two would fix that;
+it has not been done.
+
+**Never `pip install opencv-python` on the Jetson.** JetPack ships its own
+CUDA-enabled OpenCV in `/usr/lib/python3/dist-packages`, and a pip build
+shadows it — the same failure mode as the matplotlib one under *Gotchas*, with
+the added cost of silently losing GPU acceleration.
+
+### arm64 notes (Jetson, and Apple Silicon VMs)
 
 **PyQt6 has no arm64 wheel on PyPI.** Anything that resolves `pyqt6` — which is
 what step 4 would do without `--no-deps` — falls back to the source
@@ -208,9 +244,8 @@ environment gets an older one because Ubuntu 22.04 ships pip 22.0.2, which
 cannot use current `packaging` wheels.
 
 Upgrading pip clears that error but is the wrong fix: the next step compiles
-PyQt6 from source, which needs the Qt6 development headers and takes a long time
-on an emulated arm64 VM, to produce a library nothing here loads. Follow step 4
-as written instead.
+PyQt6 from source, which needs the Qt6 development headers and takes a long time,
+to produce a library nothing here loads. Follow step 4 as written instead.
 
 The same "no arm64 wheel" pattern affects `quadprog==0.1.7`, whose arm64 build
 imports with `undefined symbol: _Z7qpgen2_...`. That is why `requirements.txt`
@@ -218,9 +253,9 @@ leaves `quadprog` unpinned and why `--no-deps` is mandatory there — see step 5
 
 ### x86_64
 
-No known differences. Wheels exist for everything, so a full
-`pip install -e src/f1tenth_gym_ros/f1tenth_gym` would also succeed — it just
-pulls in the renderer this workspace never loads.
+No known differences; wheels exist for everything. A full
+`pip install -e src/f1tenth_gym_ros/f1tenth_gym` would also succeed here, it
+just pulls in the renderer this workspace never loads.
 
 ---
 

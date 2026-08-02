@@ -32,27 +32,9 @@ import cv2
 import numpy as np
 import yaml
 
-
-def resolve_source_dir(path: str) -> str:
-    """
-    Map an installed share path back to its source directory.
-
-    Launch files hand us `$(find-pkg-share stack_master)/maps/<map>`, but the
-    generated artifacts belong in src/ where they are version controlled. With
-    `colcon build --symlink-install` the files inside the install tree are
-    symlinks back to src, so resolving one of them yields the source directory
-    without hardcoding the workspace or repository name.
-
-    Falls back to the given path when nothing resolvable is found (a plain,
-    non-symlink install, or a path that is already in src).
-    """
-    if not path or not os.path.isdir(path):
-        return path
-    for name in sorted(os.listdir(path)):
-        entry = os.path.join(path, name)
-        if os.path.islink(entry):
-            return os.path.dirname(os.path.realpath(entry))
-    return path
+# Re-exported for the generator's convenience. It lives in paths.py so that
+# raceline_publisher can reach it without importing OpenCV - see the note there.
+from .paths import resolve_source_dir  # noqa: F401
 
 
 def load_map(map_dir: str, map_name: str):

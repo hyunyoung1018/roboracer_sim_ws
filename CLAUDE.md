@@ -13,8 +13,15 @@ take it from race_stack instead.
 
 - Development happens on macOS; **everything actually runs on Ubuntu 22.04 /
   ROS 2 Humble** in UTM. Do not assume a command can be executed locally.
-- Car is `albomb`. TF frames use `ego_racecar/*` so sim and real share one set
-  of frames with no remapping — this is deliberate, don't "fix" it.
+- Car is `albomb`, on a **Jetson Orin Nano Super** (arm64, JetPack 6 / Ubuntu
+  22.04). arm64 is the deployment target, not an edge case — never assume an
+  x86-only wheel is acceptable.
+- TF frames use `ego_racecar/*` so sim and real share one set of frames with no
+  remapping — this is deliberate, don't "fix" it.
+- Raceline generation is **offline, on the laptop**. The car only reads
+  `global_waypoints.json`. Keep `raceline_publisher` free of OpenCV, numpy and
+  `trajectory_planning_helpers` — that is why `paths.py` is separate from
+  `map_io.py`. See README's *Where this runs*.
 - Setup order and the traps are in `README.md`. Both pip steps need `--no-deps`
   and neither is optional — see the file for why. Never install the vendored
   subtree's own requirements.txt (2020-era pins).

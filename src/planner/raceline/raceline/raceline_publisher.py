@@ -18,7 +18,7 @@ from visualization_msgs.msg import MarkerArray
 
 from f110_msgs.msg import WpntArray
 
-from . import map_io
+from .paths import resolve_source_dir
 from .readwrite_global_waypoints import read_global_waypoints
 
 
@@ -31,7 +31,7 @@ class RacelinePublisher(Node):
         self.declare_parameter('rate', 1.0)
         self.declare_parameter('publish_markers', True)
 
-        map_dir = map_io.resolve_source_dir(self.get_parameter('map_dir').value)
+        map_dir = resolve_source_dir(self.get_parameter('map_dir').value)
         if not map_dir:
             raise RuntimeError('map_dir parameter is required')
         self.publish_markers = bool(self.get_parameter('publish_markers').value)
