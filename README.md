@@ -64,8 +64,14 @@ dependencies it actually uses:
 
 ```bash
 pip install -e src/f1tenth_gym_ros/f1tenth_gym --no-deps
-pip install gymnasium numba pandas pillow requests "scipy>=1.13" yamldataclassconfig
+pip install "gymnasium>=0.29.1,<0.30" "numba>=0.59.0" "pandas>=2.0.0" \
+            "pillow>=9.1.0" "requests>=2.31.0" "scipy>=1.13.0" \
+            "yamldataclassconfig>=1.5.0,<2"
 ```
+
+The version bounds are copied verbatim from the gym's own `pyproject.toml`.
+Do not drop them: `yamldataclassconfig` is capped below 2.0, and installing it
+unconstrained gets you 2.x, which the gym rejects.
 
 Do this **before** step 5.
 
@@ -80,12 +86,31 @@ the environment with `render_enabled=False`, and `F110Env` only calls
 `make_renderer()` — the sole place PyQt6 is imported — when that flag is set.
 Visualisation is RViz and Foxglove.
 
-The second line is every third-party module the gym imports outside
-`envs/rendering/`, minus `numpy`, `opencv-python` and `PyYAML`, which step 3
-already installed from apt. `scipy` is in the list despite also coming from apt:
-22.04 ships 1.8.0 and the gym needs `>=1.13`, so pip has to shadow it. The list
-was derived by reading the imports, so if something still surfaces at runtime,
-add it here.
+The second line is the gym's dependency list minus four things: the renderer,
+and `numpy` / `opencv-python` / `PyYAML`, which step 3 already installed from
+apt. `scipy` stays in despite also coming from apt — 22.04 ships 1.8.0 and the
+gym needs `>=1.13`, so pip has to shadow it. `coverage` is dropped too; the gym
+declares it but never imports it outside its own tests.
+
+### The dependency-conflict warning is expected
+
+pip prints this at the end of step 4 or 5, with an `ERROR:` prefix:
+
+```
+f1tenth-gym 1.0.0.dev0 requires pyqt6<7,>=6.7.1, which is not installed.
+f1tenth-gym 1.0.0.dev0 requires pyqtgraph<0.14,>=0.13.7, which is not installed.
+f1tenth-gym 1.0.0.dev0 requires pyopengl>=3.1.9, which is not installed.
+f1tenth-gym 1.0.0.dev0 requires pyopengl-accelerate>=3.1.9, which is not installed.
+f1tenth-gym 1.0.0.dev0 requires coverage>=7.6.1, but you have coverage 6.2 ...
+```
+
+Those five lines are the intended outcome, not a failure — the four renderer
+packages are the ones `--no-deps` skipped, and `coverage` is apt's, used only by
+the gym's test suite. pip is reporting the state of the environment; nothing
+here is installing.
+
+Any *other* package in that warning is a real problem. Step 7 is what actually
+decides whether the install worked.
 
 If you specifically want the gym's own renderer — for standalone (non-ROS) use
 of the simulator — install it separately on x86_64:
