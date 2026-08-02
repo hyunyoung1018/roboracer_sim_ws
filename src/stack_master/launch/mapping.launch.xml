@@ -1,0 +1,105 @@
+<?xml version="1.0"?>
+<!--
+  mapping.launch.xml - build a new map with cartographer SLAM.
+
+  Drive the car around the track, then, from a second terminal:
+
+      ros2 service call /finish_mapping std_srvs/srv/Trigger {}
+
+  which writes maps/<map>/<map>.{pbstream,png,yaml} and exits the mapping stage.
+  From there:
+
+      ros2 launch stack_master raceline_generator.launch.xml map:=<map>
+
+  PREREQUISITE: the sensor drivers are NOT started here. This launch expects
+  /scan, /vesc/odom and /vesc/sensors/imu/raw to already be publishing, and
+  something to drive the car with (teleop). race_stack bundled its f1tenth_stack
+  bringup into the mapping launch; that is what hardware.launch.xml will be, and
+  it is not written yet. Until then, bring the drivers up separately.
+
+  Data path (see CLAUDE.md "State estimation" and config/common/mapping_2d.lua):
+
+      VESC odom + VESC IMU -> EKF -> /early_fusion/odom -> cartographer
+                                     LiDAR /scan        -> cartographer
+      cartographer owns TF (map -> ego_racecar/base_link); the EKF never
+      publishes TF.
+
+  There is no `sim` argument. mapping_2d.lua is written for the real car, and
+  the gym bridge already publishes its own odom and TF, which would fight
+  cartographer for map -> base_link.
+-->
+<launch>
+  <arg name="map" description="Name of the map to create (folder under stack_master/maps/)"/>
+  <arg name="rviz" default="true"/>
+  <arg name="resolution" default="0.05"
+       description="[m/cell] occupancy grid resolution. The raceline stage assumes 0.05."/>
+  <arg name="use_sim_time" default="false"/>
+
+  <let name="config_dir" value="$(find-pkg-share stack_master)/config"/>
+  <let name="maps_dir" value="$(find-pkg-share stack_master)/maps"/>
+
+  <!-- ===== robot description ===== -->
+  <!-- Cartographer needs TF from tracking_frame (ego_racecar/base_link) to the
+       laser frame to place scans. That comes from albomb's URDF, not from the
+       drivers, so it is published here rather than in hardware bringup. -->
+  <node pkg="robot_state_publisher" exec="robot_state_publisher" name="robot_state_publisher">
+    <param name="robot_description"
+           value="$(command 'xacro $(find-pkg-share albomb_description)/urdf/albomb.urdf.xacro')"/>
+    <param name="use_sim_time" value="$(var use_sim_time)"/>
+  </node>
+
+  <!-- ===== early fusion: VESC odom + IMU -> /early_fusion/odom ===== -->
+  <!-- Node name must stay ekf_filter_node: that is the key ekf.yaml is written
+       under. publish_tf is false in that file - cartographer owns TF. -->
+  <node pkg="robot_localization" exec="ekf_node" name="ekf_filter_node" output="screen">
+    <param from="$(var config_dir)/common/ekf.yaml"/>
+    <param name="use_sim_time" value="$(var use_sim_time)"/>
+    <remap from="/odometry/filtered" to="/early_fusion/odom"/>
+  </node>
+
+  <!-- ===== cartographer ===== -->
+  <!-- The minloglevel argument keeps glog's per-scan chatter out of the way;
+       warnings and errors still come through. (It cannot be named in this
+       comment with its leading dashes: a double hyphen is illegal inside an XML
+       comment, and the launch file silently fails to parse.) -->
+  <node pkg="cartographer_ros" exec="cartographer_node" name="cartographer_node"
+        output="screen"
+        args="-configuration_directory $(var config_dir)/common
+              -configuration_basename mapping_2d.lua
+              --minloglevel 2">
+    <param name="use_sim_time" value="$(var use_sim_time)"/>
+    <remap from="odom" to="/early_fusion/odom"/>
+  </node>
+
+  <node pkg="cartographer_ros" exec="cartographer_occupancy_grid_node"
+        name="cartographer_occupancy_grid_node"
+        args="-resolution $(var resolution)">
+    <param name="use_sim_time" value="$(var use_sim_time)"/>
+  </node>
+
+  <!-- ===== map saving ===== -->
+  <!-- map_saver_server turns the live /map topic into the nav2 png/yaml pair.
+       It is a lifecycle node, hence the lifecycle manager: without it the node
+       stays unconfigured and the save service never appears. -->
+  <node pkg="nav2_map_server" exec="map_saver_server" name="map_saver" output="screen">
+    <param name="save_map_timeout" value="5.0"/>
+    <param name="free_thresh_default" value="0.196"/>
+    <param name="occupied_thresh_default" value="0.65"/>
+    <param name="use_sim_time" value="$(var use_sim_time)"/>
+  </node>
+  <node pkg="nav2_lifecycle_manager" exec="lifecycle_manager"
+        name="lifecycle_manager_mapping" output="screen">
+    <param name="autostart" value="true"/>
+    <param name="node_names" value="[map_saver]"/>
+    <param name="use_sim_time" value="$(var use_sim_time)"/>
+  </node>
+
+  <node pkg="mapping" exec="finish_mapping" name="finish_mapping" output="screen">
+    <param name="map_name" value="$(var map)"/>
+    <param name="maps_dir" value="$(var maps_dir)"/>
+    <param name="use_sim_time" value="$(var use_sim_time)"/>
+  </node>
+
+  <node pkg="rviz2" exec="rviz2" name="rviz2" if="$(var rviz)"
+        args="-d $(find-pkg-share mapping)/rviz/mapping.rviz"/>
+</launch>

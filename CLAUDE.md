@@ -33,13 +33,29 @@ take it from race_stack instead.
 
 | Launch | Status |
 |---|---|
-| `mapping.launch.xml` — cartographer + `finish_mapping` | not written |
+| `mapping.launch.xml` — cartographer + `finish_mapping` | **written, never run on the car** |
 | `raceline_generator.launch.xml` — map → `global_waypoints.json` + sectors | **done** |
 | `raceline_editor.launch.xml` — edit an existing json | not written |
 
+Mapping starts no drivers. It expects `/scan`, `/vesc/odom` and
+`/vesc/sensors/imu/raw` to already be publishing — that is what
+`hardware.launch.xml` will be, and until it exists the drivers come up by hand.
+Everything except the sensor data has been exercised: all seven nodes start,
+cartographer accepts `mapping_2d.lua`, `map_saver` activates, and
+`finish_mapping` resolves the install path back to src and writes there.
+
+`finish_mapping` refuses to act unless a grid has actually arrived on `/map`.
+Checking publisher *count* is not enough — `cartographer_occupancy_grid_node`
+advertises the topic at startup whether or not it has submaps — and the
+distinction matters because `/finish_trajectory` cannot be undone: cartographer
+takes no further scans into a finished trajectory, so a failure discovered after
+that point costs the whole drive.
+
 Also missing: `base_system.launch.xml`, `hardware.launch.xml`, a launch for
 `raceline_publisher`, and the `vesc_driver` IMU `frame_id` fix (it publishes an
-empty frame_id, so robot_localization silently drops every IMU sample).
+empty frame_id, so robot_localization silently drops every IMU sample). That
+last one lands on mapping directly: with the frame_id empty the EKF drops every
+IMU sample, so `/early_fusion/odom` degrades to wheel odometry alone.
 
 race_stack does all of this in one node behind `create_map` /
 `create_global_path` / `map_editor` flags. Those flags are gone: which stage
