@@ -37,10 +37,16 @@ take it from race_stack instead.
 | `raceline_generator.launch.xml` — map → `global_waypoints.json` + sectors | **done** |
 | `raceline_editor.launch.xml` — edit an existing json | not written |
 
-Mapping starts no drivers. It expects `/scan`, `/vesc/odom` and
-`/vesc/sensors/imu/raw` to already be publishing — that is what
-`hardware.launch.xml` will be, and until it exists the drivers come up by hand.
-Everything except the sensor data has been exercised: all seven nodes start,
+Under those sit two launches that are not stages, just bringup:
+
+| Launch | Status |
+|---|---|
+| `hardware.launch.xml` — LiDAR, VESC, teleop, robot description | written, never run on the car |
+| `base_system.launch.xml` — `sim:=true\|false` branch + raceline + sectors | written, never run |
+
+`mapping.launch.xml` includes `hardware.launch.xml` (`hardware:=false` to skip),
+so mapping is one command. Everything except the sensor data has been exercised
+on the mapping side: all seven nodes start,
 cartographer accepts `mapping_2d.lua`, `map_saver` activates, and
 `finish_mapping` resolves the install path back to src and writes there.
 
@@ -51,11 +57,21 @@ distinction matters because `/finish_trajectory` cannot be undone: cartographer
 takes no further scans into a finished trajectory, so a failure discovered after
 that point costs the whole drive.
 
-Also missing: `base_system.launch.xml`, `hardware.launch.xml`, a launch for
-`raceline_publisher`, and the `vesc_driver` IMU `frame_id` fix (it publishes an
-empty frame_id, so robot_localization silently drops every IMU sample). That
-last one lands on mapping directly: with the frame_id empty the EKF drops every
-IMU sample, so `/early_fusion/odom` degrades to wheel odometry alone.
+Still missing: a driving mode on top of `base_system` (`time_trials` /
+`head_to_head`, both needing a controller and state machine that are not
+ported), localisation for `mode:=car` (the particle filter is present but
+unwired, so there is no `map -> odom` while racing), and a command mux — until
+one exists `joy_teleop` publishes straight to `/vesc/ackermann_cmd` and a
+controller would fight it for that topic.
+
+Also missing: the `vesc_driver` IMU `frame_id` fix. It publishes an empty
+frame_id, so robot_localization cannot look up the transform and silently drops
+every IMU sample — `/early_fusion/odom` degrades to wheel odometry alone, which
+lands on mapping quality directly.
+
+**The four VESC calibration gains in `config/car/vesc.yaml` are still
+ForzaETH's**, not measured on albomb. Speed and steering angle will both be
+wrong until they are.
 
 race_stack does all of this in one node behind `create_map` /
 `create_global_path` / `map_editor` flags. Those flags are gone: which stage

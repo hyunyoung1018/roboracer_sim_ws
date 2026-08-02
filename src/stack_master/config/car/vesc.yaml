@@ -1,0 +1,63 @@
+# VESC 6 MkVI - motor driver, servo, wheel odometry and IMU.
+#
+# Seeded from ForzaETH race_stack (stack_master/config/NUC2/vesc.yaml). The
+# four calibration gains below are PER CAR and have NOT been measured on albomb.
+# Driving on them will get the wrong speed and the wrong steering angle.
+#
+# TODO - measure on albomb before the first real run:
+#   speed_to_erpm_gain            drive a known distance, compare /vesc/odom
+#                                 travel against the tape measure
+#   steering_angle_to_servo_gain  \  centre the wheels to find the offset, then
+#   steering_angle_to_servo_offset/  drive a steady circle and solve
+#                                    tan(delta) = wheelbase / turn_radius
+#   servo_min / servo_max         raise until the steering hits its mechanical
+#                                 stop, then back off - a servo that stalls
+#                                 against the stop overheats
+#
+# Everything below sits under /** so all three vesc nodes share it.
+
+/**:
+  ros__parameters:
+    # erpm = speed_to_erpm_gain * speed[m/s] + speed_to_erpm_offset
+    speed_to_erpm_gain: 4352.0
+    speed_to_erpm_offset: 220.0
+
+    # servo[0..1] = steering_angle_to_servo_gain * angle[rad] + offset
+    steering_angle_to_servo_gain: -1.1
+    steering_angle_to_servo_offset: 0.445
+
+    # Prefer a udev-pinned symlink over /dev/ttyACM0: the ACM number changes
+    # with enumeration order, so a reboot can silently point this at something
+    # else. Create /etc/udev/rules.d/99-vesc.rules keyed on the adapter's serial.
+    port: /dev/sensors/vesc
+
+    duty_cycle_min: 0.0
+    duty_cycle_max: 0.0
+    current_min: 0.0
+    current_max: 100.0
+    brake_min: -20000.0
+    brake_max: 200000.0
+    speed_min: -69000.0
+    speed_max: 69000.0
+    position_min: 0.0
+    position_max: 0.0
+    servo_min: 0.15
+    servo_max: 0.85
+
+vesc_to_odom_node:
+  ros__parameters:
+    odom_frame: odom
+    base_frame: ego_racecar/base_link
+
+    # False, and it must stay false. Cartographer owns map -> base_link while
+    # mapping, and the particle filter owns it while racing. A second publisher
+    # on the same edge makes the pose jitter between two sources.
+    publish_tf: false
+
+    # Yaw is integrated from the SERVO COMMAND through a bicycle model, not
+    # measured. That is why this odometry is only ever a scan-matcher hint and
+    # is weighted out of the pose graph - see CLAUDE.md.
+    use_servo_cmd_to_calc_angular_velocity: true
+
+    # From albomb_description/urdf/albomb_core.xacro (wheel_base).
+    wheelbase: 0.324

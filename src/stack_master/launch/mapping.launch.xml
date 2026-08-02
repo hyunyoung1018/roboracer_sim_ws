@@ -11,11 +11,9 @@
 
       ros2 launch stack_master raceline_generator.launch.xml map:=<map>
 
-  PREREQUISITE: the sensor drivers are NOT started here. This launch expects
-  /scan, /vesc/odom and /vesc/sensors/imu/raw to already be publishing, and
-  something to drive the car with (teleop). race_stack bundled its f1tenth_stack
-  bringup into the mapping launch; that is what hardware.launch.xml will be, and
-  it is not written yet. Until then, bring the drivers up separately.
+  The sensor drivers come up with it: hardware.launch.xml is included, which is
+  also what supplies the robot description and the teleop you drive with. Pass
+  hardware:=false if they are already running from another terminal.
 
   Data path (see CLAUDE.md "State estimation" and config/common/mapping_2d.lua):
 
@@ -31,6 +29,8 @@
 <launch>
   <arg name="map" description="Name of the map to create (folder under stack_master/maps/)"/>
   <arg name="rviz" default="true"/>
+  <arg name="hardware" default="true"
+       description="Bring up the drivers, teleop and robot description"/>
   <arg name="resolution" default="0.05"
        description="[m/cell] occupancy grid resolution. The raceline stage assumes 0.05."/>
   <arg name="use_sim_time" default="false"/>
@@ -38,15 +38,13 @@
   <let name="config_dir" value="$(find-pkg-share stack_master)/config"/>
   <let name="maps_dir" value="$(find-pkg-share stack_master)/maps"/>
 
-  <!-- ===== robot description ===== -->
+  <!-- ===== drivers, teleop, robot description ===== -->
   <!-- Cartographer needs TF from tracking_frame (ego_racecar/base_link) to the
-       laser frame to place scans. That comes from albomb's URDF, not from the
-       drivers, so it is published here rather than in hardware bringup. -->
-  <node pkg="robot_state_publisher" exec="robot_state_publisher" name="robot_state_publisher">
-    <param name="robot_description"
-           value="$(command 'xacro $(find-pkg-share albomb_description)/urdf/albomb.urdf.xacro')"/>
-    <param name="use_sim_time" value="$(var use_sim_time)"/>
-  </node>
+       laser frame to place scans; that comes from albomb's URDF, published by
+       hardware.launch.xml along with the drivers. -->
+  <group if="$(var hardware)">
+    <include file="$(find-pkg-share stack_master)/launch/hardware.launch.xml"/>
+  </group>
 
   <!-- ===== early fusion: VESC odom + IMU -> /early_fusion/odom ===== -->
   <!-- Node name must stay ekf_filter_node: that is the key ekf.yaml is written

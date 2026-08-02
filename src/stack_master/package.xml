@@ -25,11 +25,30 @@
        package that does not exist makes `rosdep install` fail for the whole
        workspace, not just this package. -->
   <!-- <exec_depend>controller</exec_depend> -->
+  <!-- hardware.launch.xml -->
   <exec_depend>vesc_driver</exec_depend>
+  <exec_depend>vesc_ackermann</exec_depend>
   <exec_depend>urg_node</exec_depend>
-  <exec_depend>tf2_ros</exec_depend>
-  <exec_depend>nav2_map_server</exec_depend>
+  <exec_depend>joy_teleop</exec_depend>
+  <exec_depend>robot_state_publisher</exec_depend>
+  <exec_depend>xacro</exec_depend>
+
+  <!-- mapping.launch.xml -->
   <exec_depend>cartographer_ros</exec_depend>
+  <exec_depend>mapping</exec_depend>
+
+  <!-- mapping + raceline_generator: map_saver_server / map_server are lifecycle
+       nodes and stay unconfigured without the manager. -->
+  <exec_depend>nav2_map_server</exec_depend>
+  <exec_depend>nav2_lifecycle_manager</exec_depend>
+
+  <!-- base_system.launch.xml -->
+  <exec_depend>raceline</exec_depend>
+  <exec_depend>sector_tuner</exec_depend>
+  <exec_depend>lap_analyser</exec_depend>
+
+  <exec_depend>tf2_ros</exec_depend>
+  <exec_depend>rviz2</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
