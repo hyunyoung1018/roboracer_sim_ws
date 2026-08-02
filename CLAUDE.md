@@ -18,10 +18,13 @@ take it from race_stack instead.
   x86-only wheel is acceptable.
 - TF frames use `ego_racecar/*` so sim and real share one set of frames with no
   remapping — this is deliberate, don't "fix" it.
-- Raceline generation is **offline, on the laptop**. The car only reads
-  `global_waypoints.json`. Keep `raceline_publisher` free of OpenCV, numpy and
-  `trajectory_planning_helpers` — that is why `paths.py` is separate from
-  `map_io.py`. See README's *Where this runs*.
+- **Everything runs on the Jetson**, raceline generation included. The laptop VM
+  is a stand-in until the car exists, not a separate deployment target — so
+  there is one install path, not two.
+- Never let a pip `opencv-python` in: JetPack's CUDA-enabled build lives in
+  `/usr/lib/python3/dist-packages` and a pip one shadows it.
+- The offline tools need a display (RViz, and the sector slicers' matplotlib
+  windows). Runtime nodes are headless.
 - Setup order and the traps are in `README.md`. Both pip steps need `--no-deps`
   and neither is optional — see the file for why. Never install the vendored
   subtree's own requirements.txt (2020-era pins).

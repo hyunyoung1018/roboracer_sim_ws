@@ -190,44 +190,31 @@ Useful arguments:
 
 ## Where this runs
 
-Two targets, and they need different amounts of this workspace.
+**The whole workspace runs on the car — a Jetson Orin Nano Super.** Raceline
+generation, the simulator and the sector tuners all run there too; nothing is
+split off onto a separate machine. A laptop VM is only a stand-in until the car
+is available.
 
-### Development machine — full install
+That makes the setup single-path: the steps above are the steps, everywhere.
+Both targets are arm64 on Ubuntu 22.04, so the environment is the same one
+twice rather than two environments to keep in sync.
 
-The setup above. Simulator, raceline generation, sector tuning, RViz. Both
-architectures work and the steps are identical; the arm64 notes below apply if
-you are on Apple Silicon under UTM/Parallels.
+### Jetson Orin Nano Super
 
-### The car — Jetson Orin Nano Super
+JetPack 6 is Ubuntu 22.04, so ROS 2 Humble is a native fit and no step changes.
+Two things to know:
 
-**arm64, JetPack 6 (Ubuntu 22.04), so ROS 2 Humble is a native fit** and the
-same instructions apply. But the car does not run raceline generation. That is
-an offline step: generate on the laptop, commit `global_waypoints.json` and the
-sector yamls with the map, and the car only reads them.
+**Never `pip install opencv-python`.** JetPack ships its own CUDA-enabled
+OpenCV in `/usr/lib/python3/dist-packages`, and a pip build shadows it — the
+same failure mode as the matplotlib one under *Gotchas*, with the added cost of
+silently losing GPU acceleration. Step 4's `--no-deps` is what keeps the gym
+from pulling one in.
 
-So on the Jetson you can skip:
-
-| Skip | Why |
-|---|---|
-| `pip install --no-deps -r requirements.txt` | `trajectory_planning_helpers` and `quadprog` are the optimizer's solvers |
-| the vendored `f1tenth_gym` (step 4) | the simulator never runs on the car |
-| `raceline_generator`, `sector_slicer`, `ot_sector_slicer` | offline tools; they open matplotlib GUIs |
-
-`raceline_publisher` is the only node from the `raceline` package that runs
-while racing, and it imports nothing outside ROS — no OpenCV, no numpy, no
-`trajectory_planning_helpers`. Keep it that way: it is the reason `paths.py`
-exists separately from `map_io.py`.
-
-**Caveat:** `raceline/package.xml` still declares `python3-skimage`,
-`python3-opencv` and `python3-matplotlib`, because the generator lives in the
-same package. `rosdep install` on the Jetson therefore pulls them in even though
-the publisher never touches them. Splitting the package in two would fix that;
-it has not been done.
-
-**Never `pip install opencv-python` on the Jetson.** JetPack ships its own
-CUDA-enabled OpenCV in `/usr/lib/python3/dist-packages`, and a pip build
-shadows it — the same failure mode as the matplotlib one under *Gotchas*, with
-the added cost of silently losing GPU acceleration.
+**The offline tools need a display.** `raceline_generator` opens RViz, and the
+two sector slicers open blocking matplotlib windows. Over a bare SSH session
+they will hang with no visible error. Use the Jetson's own monitor, `ssh -X`,
+or a VNC session when generating a raceline. Everything needed while actually
+driving — `raceline_publisher` and the runtime nodes — is headless.
 
 ### arm64 notes (Jetson, and Apple Silicon VMs)
 
