@@ -61,3 +61,11 @@ vesc_to_odom_node:
 
     # From albomb_description/urdf/albomb_core.xacro (wheel_base).
     wheelbase: 0.324
+
+vesc_driver_node:
+  ros__parameters:
+    # Stamped on both IMU messages. Must name a link that exists in albomb's
+    # URDF, because cartographer resolves it against tracking_frame and
+    # robot_localization looks it up in TF. Upstream left it empty, which makes
+    # both drop the samples without an error.
+    imu_frame_id: ego_racecar/imu

@@ -29,3 +29,5 @@ cmake_install.cmake
 
 .DS_Store
 Thumbs.db
+# Local working context for Claude Code - not published.
+CLAUDE.md

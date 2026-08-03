@@ -39,9 +39,10 @@
   <let name="maps_dir" value="$(find-pkg-share stack_master)/maps"/>
   <let name="map_dir"  value="$(var maps_dir)/$(var map)"/>
 
-  <!-- Derived, for anything that needs the config directory name. -->
-  <let name="mode" value="sim" if="$(var sim)"/>
-  <let name="mode" value="car" unless="$(var sim)"/>
+  <!-- The gym publishes /clock when sim.yaml sets use_sim_time. lap_analyser
+       times laps off get_clock(), so anything started here has to agree with
+       the bridge or lap times are measured against wall time. -->
+  <let name="use_sim_time" value="$(var sim)"/>
 
   <!-- ===== simulator ===== -->
   <group if="$(var sim)">
@@ -59,6 +60,7 @@
   <group if="$(var raceline)">
     <node pkg="raceline" exec="raceline_publisher" name="raceline_publisher" output="screen">
       <param name="map_dir" value="$(var map_dir)"/>
+      <param name="use_sim_time" value="$(var use_sim_time)"/>
     </node>
   </group>
 
@@ -71,12 +73,16 @@
   <group if="$(var sectors)">
     <node pkg="sector_tuner" exec="sector_tuner" name="sector_tuner" output="screen">
       <param from="$(var map_dir)/speed_scaling.yaml"/>
+      <param name="use_sim_time" value="$(var use_sim_time)"/>
     </node>
     <node pkg="sector_tuner" exec="ot_interpolator" name="ot_interpolator" output="screen">
       <param from="$(var map_dir)/ot_sectors.yaml"/>
+      <param name="use_sim_time" value="$(var use_sim_time)"/>
     </node>
   </group>
 
   <!-- ===== lap timing ===== -->
-  <node pkg="lap_analyser" exec="lap_analyser" name="lap_analyser" output="screen"/>
+  <node pkg="lap_analyser" exec="lap_analyser" name="lap_analyser" output="screen">
+    <param name="use_sim_time" value="$(var use_sim_time)"/>
+  </node>
 </launch>
