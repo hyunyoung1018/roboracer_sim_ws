@@ -38,6 +38,10 @@
   <arg name="teleop" default="true"  description="Start joy + joy_teleop"/>
   <arg name="description" default="true"
        description="Publish albomb's URDF. Turn off if something else already does."/>
+  <!-- Default matches vesc.yaml, which points at a udev symlink. That rule has
+       to be written before it exists, so a first bringup overrides it:
+       vesc_port:=/dev/ttyACM0 -->
+  <arg name="vesc_port" default="/dev/sensors/vesc" description="VESC serial port"/>
 
   <let name="config_dir" value="$(find-pkg-share stack_master)/config/car"/>
 
@@ -71,6 +75,8 @@
     <node pkg="vesc_driver" exec="vesc_driver_node" name="vesc_driver_node"
           namespace="vesc" output="screen">
       <param from="$(var config_dir)/vesc.yaml"/>
+      <!-- After the file, so the argument wins. -->
+      <param name="port" value="$(var vesc_port)"/>
     </node>
 
     <node pkg="vesc_ackermann" exec="ackermann_to_vesc_node"
