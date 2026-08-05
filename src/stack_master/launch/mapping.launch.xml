@@ -34,7 +34,11 @@
 -->
 <launch>
   <arg name="map" description="Name of the map to create (folder under stack_master/maps/)"/>
-  <arg name="rviz" default="true"/>
+  <arg name="rviz" default="true"
+       description="Needs a display. On a headless car use foxglove instead."/>
+  <arg name="foxglove" default="false"
+       description="Serve the topics over websocket so a laptop can watch the map build"/>
+  <arg name="foxglove_port" default="8765"/>
   <arg name="hardware" default="true"
        description="Bring up the drivers, teleop and robot description"/>
   <arg name="resolution" default="0.05"
@@ -100,4 +104,14 @@
 
   <node pkg="rviz2" exec="rviz2" name="rviz2" if="$(var rviz)"
         args="-d $(find-pkg-share mapping)/rviz/mapping.rviz"/>
+
+  <!-- The car has no display, and mapping is the one stage you cannot do blind:
+       coverage and loop closure have to be watched before finish_mapping is
+       called, because /finish_trajectory cannot be undone. Connect from a
+       laptop on the same network to ws://<jetson-ip>:8765. -->
+  <node pkg="foxglove_bridge" exec="foxglove_bridge" name="foxglove_bridge"
+        output="screen" if="$(var foxglove)">
+    <param name="port" value="$(var foxglove_port)"/>
+    <param name="use_sim_time" value="$(var use_sim_time)"/>
+  </node>
 </launch>
