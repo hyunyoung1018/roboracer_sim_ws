@@ -43,14 +43,16 @@ def load_map(map_dir: str, map_name: str):
 
     Returns
     -------
-    filtered_map : np.ndarray
-        Binary map image, uint8, flipped vertically so that array row 0 is the
-        bottom of the map. Cell (row, col) then maps to metres as
+    image : np.ndarray
+        Map image, uint8, flipped vertically so that array row 0 is the bottom
+        of the map. Cell (row, col) then maps to metres as
         origin + resolution * (col, row), matching the nav2 convention.
     resolution : float
         [m/cell]
     origin : tuple[float, float]
         (x, y) of the map origin in metres.
+    meta : dict
+        The parsed yaml, so binarize() can apply the map's own thresholds.
     """
     img_path = os.path.join(map_dir, map_name + '.png')
     yaml_path = os.path.join(map_dir, map_name + '.yaml')
@@ -68,20 +70,36 @@ def load_map(map_dir: str, map_name: str):
     with open(yaml_path, 'r') as f:
         meta = yaml.safe_load(f)
 
-    return image, float(meta['resolution']), (float(meta['origin'][0]), float(meta['origin'][1]))
+    return (image, float(meta['resolution']),
+            (float(meta['origin'][0]), float(meta['origin'][1])), meta)
 
 
-def binarize(image: np.ndarray, occupied_threshold: int = 128,
-             filter_kernel_size: int = 0) -> np.ndarray:
+def binarize(image: np.ndarray, meta: dict, filter_kernel_size: int = 0) -> np.ndarray:
     """
     Turn the map image into the binary form the centerline extraction expects:
     free space 255, everything else 0.
 
+    The threshold comes from the map's own `free_thresh`, following the nav2
+    convention: occupancy = (255 - pixel) / 255 when negate is 0, and a cell is
+    free only when that is below free_thresh.
+
+    This matters more than it looks. A cartographer map has three levels - 0
+    occupied, 205 unknown, 254/255 free - and 205 is exactly the free_thresh
+    boundary. A naive mid-grey threshold puts unknown on the free side, so every
+    never-observed cell becomes drivable, the skeleton grows through it, and the
+    centerline comes out of whatever contour that produced. race_stack's mapping
+    node makes the same call from the other direction, mapping unknown to
+    occupied before thresholding.
+
     `filter_kernel_size` > 0 applies a morphological opening, which removes
     isolated lidar speckle that would otherwise grow spurious skeleton branches.
-    Leave it at 0 for maps that have already been cleaned up by hand.
     """
-    binary = np.where(image > occupied_threshold, 255, 0).astype(np.uint8)
+    free_thresh = float(meta.get('free_thresh', 0.196))
+    negate = int(meta.get('negate', 0))
+
+    occupancy = image.astype(float) / 255.0 if negate else (255.0 - image) / 255.0
+    binary = np.where(occupancy < free_thresh, 255, 0).astype(np.uint8)
+
     if filter_kernel_size and filter_kernel_size > 1:
         kernel = np.ones((filter_kernel_size, filter_kernel_size), np.uint8)
         binary = cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel, iterations=2)

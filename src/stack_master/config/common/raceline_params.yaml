@@ -12,14 +12,13 @@ raceline_generator:
     # slightly smaller, since the overtaking line is allowed to run tighter.
     safety_width_sp: 0.7
 
-    # Grey level above which a map pixel counts as free space. Standard nav2
-    # maps are 0 (occupied) / 205 (unknown) / 254 (free), so 128 splits them.
-    occupied_threshold: 128
-
     # Morphological opening kernel [cells] applied before skeletonizing.
-    # 0 disables it. Raise it (7-9) for a raw SLAM map with lidar speckle that
-    # grows spurious skeleton branches; leave at 0 for a hand-cleaned map.
-    filter_kernel_size: 0
+    # 0 disables it. 5 is what a raw cartographer map needs: on test_1 it takes
+    # the closed-contour count from 5 down to 2, which is the clean signature of
+    # a single track loop. Hand-drawn maps are unaffected by it.
+    # (The free/occupied threshold is NOT a parameter - it comes from each map's
+    # own free_thresh, see map_io.binarize.)
+    filter_kernel_size: 5
 
     # [s] how long to wait for an RViz "2D Pose Estimate" to set the start line.
     # 0 skips the wait and uses start_pose / track_meta.yaml / the map origin.

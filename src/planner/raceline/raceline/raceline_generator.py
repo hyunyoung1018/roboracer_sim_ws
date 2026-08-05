@@ -65,7 +65,6 @@ class RacelineGenerator(Node):
         self.declare_parameter('safety_width_sp', 0.7)
         self.declare_parameter('reverse', False)
         self.declare_parameter('show_plots', False)
-        self.declare_parameter('occupied_threshold', 128)
         self.declare_parameter('filter_kernel_size', 0)
         # [x, y, theta]; empty means "fall back to track_meta.yaml / RViz / origin"
         self.declare_parameter('start_pose', [])
@@ -196,14 +195,13 @@ class RacelineGenerator(Node):
     # ------------------------------------------------------------------- plan
 
     def generate(self) -> bool:
-        image, resolution, origin = map_io.load_map(self.map_dir, self.map_name)
+        image, resolution, origin, map_meta = map_io.load_map(self.map_dir, self.map_name)
         self.get_logger().info(
             f'Loaded map {self.map_name}: {image.shape[1]}x{image.shape[0]} cells '
             f'@ {resolution} m/cell, origin {origin}')
 
         binary = map_io.binarize(
-            image,
-            occupied_threshold=int(self.get_parameter('occupied_threshold').value),
+            image, map_meta,
             filter_kernel_size=int(self.get_parameter('filter_kernel_size').value))
         skeleton = skeletonize(binary, method='lee')
 

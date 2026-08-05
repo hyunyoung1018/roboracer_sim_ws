@@ -45,7 +45,8 @@ def conv_psi(psi: float) -> float:
 
 
 def extract_centerline(skeleton: np.ndarray, map_resolution: float,
-                       cent_length: float = 0.0) -> np.ndarray:
+                       cent_length: float = 0.0,
+                       min_length_m: float = 5.0) -> np.ndarray:
     """
     Pull the centerline out of the skeletonized binary map, in cells.
 
@@ -79,11 +80,25 @@ def extract_centerline(skeleton: np.ndarray, map_resolution: float,
         if cent_length == 0.0 or np.abs(cent_length / line_length - 1.0) < 0.15:
             line_lengths[i] = line_length
 
-    min_line_length = min(line_lengths)
-    if min_line_length == np.inf:
-        raise ValueError('No closed contour matched the expected centerline length')
+    # Anything shorter than min_length_m is not a race track. Without this the
+    # shortest contour wins outright, and on a real SLAM map that is a speckle
+    # ring rather than the track - the map looks fine, the centerline comes out
+    # a few points long, and the failure surfaces much later as a savgol error.
+    candidates = [(length, i) for i, length in enumerate(line_lengths)
+                  if length != np.inf and length >= min_length_m]
 
-    smallest = np.array(closed_contours[line_lengths.index(min_line_length)]).flatten()
+    if not candidates:
+        found = sorted(round(x, 2) for x in line_lengths if x != np.inf)
+        raise ValueError(
+            f'No closed contour longer than {min_length_m} m. Closed contours found: '
+            f'{found} m. Either the track is not closed - look for gaps in the walls - '
+            f'or these are all noise, in which case raise filter_kernel_size '
+            f'(7-9 suits a raw SLAM map) so the speckle is removed before skeletonizing.')
+
+    # Shortest survivor: the track ring yields two contours, the outer and inner
+    # side of the one-pixel skeleton loop, and the inner one hugs the centre.
+    _, best = min(candidates)
+    smallest = np.array(closed_contours[best]).flatten()
     return smallest.reshape(int(len(smallest) / 2), 2)
 
 
@@ -97,6 +112,11 @@ def smooth_centerline(centerline: np.ndarray) -> np.ndarray:
     posed, and the first/last window is taken from that second result.
     """
     n = len(centerline)
+    if n < 10:
+        raise ValueError(
+            f'Centerline has only {n} points - too few to smooth. That is a bad '
+            f'contour, not a smoothing problem; see extract_centerline.')
+
     if n > 2000:
         filter_length = int(n / 200) * 10 + 1
     elif n > 1000:
@@ -105,6 +125,13 @@ def smooth_centerline(centerline: np.ndarray) -> np.ndarray:
         filter_length = 41
     else:
         filter_length = 21
+
+    # The window has to fit the data twice over: savgol rejects a window longer
+    # than the input, and the wrap-around pass below indexes half + window.
+    filter_length = min(filter_length, n // 2)
+    if filter_length % 2 == 0:
+        filter_length -= 1
+    filter_length = max(filter_length, 5)
 
     smooth = savgol_filter(centerline, filter_length, 3, axis=0)
 
