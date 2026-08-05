@@ -105,6 +105,7 @@ VescDriver::VescDriver(const rclcpp::NodeOptions & options)
 
   // create a 50Hz timer, used for state machine & polling VESC telemetry
   timer_ = create_wall_timer(20ms, std::bind(&VescDriver::timerCallback, this));
+  // timer_ = create_wall_timer(50ms, std::bind(&VescDriver::timerCallback, this));
 
   // The IMU gets its own, faster timer. Sharing the 50 Hz telemetry timer caps
   // the IMU at the rate the state machine happens to run at, and while mapping

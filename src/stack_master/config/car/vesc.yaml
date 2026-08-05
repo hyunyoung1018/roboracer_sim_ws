@@ -19,8 +19,10 @@
 /**:
   ros__parameters:
     # erpm = speed_to_erpm_gain * speed[m/s] + speed_to_erpm_offset
-    speed_to_erpm_gain: 4352.0
-    speed_to_erpm_offset: 220.0
+    # speed_to_erpm_gain: 4352.0
+    # speed_to_erpm_offset: 220.0
+    speed_to_erpm_gain: 4425.0
+    speed_to_erpm_offset: 0.0
 
     # servo[0..1] = steering_angle_to_servo_gain * angle[rad] + offset
     steering_angle_to_servo_gain: -1.1

@@ -16,6 +16,7 @@ joy:
   ros__parameters:
     device_id: 0
     deadzone: 0.01
+    # deadzone: 0.05
     # Republish the current stick position even when nothing moves, so a held
     # deadman keeps producing commands instead of timing out.
     autorepeat_rate: 20.0
