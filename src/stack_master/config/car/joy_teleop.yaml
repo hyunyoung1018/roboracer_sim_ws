@@ -24,20 +24,16 @@ joy:
 
 joy_teleop:
   ros__parameters:
-    # Zero-scaled fallback: publishes a stop whenever no deadman is held.
-    default:
-      type: topic
-      interface_type: ackermann_msgs/msg/AckermannDriveStamped
-      topic_name: teleop
-      axis_mappings:
-        drive-speed:
-          axis: 1
-          scale: 0.0
-          offset: 0.0
-        drive-steering_angle:
-          axis: 2
-          scale: 0.0
-          offset: 0.0
+    # There is deliberately no always-on "default" entry publishing zeros.
+    # race_stack has one, but joy_teleop 1.6 (what apt ships) rejects any
+    # command without deadman_buttons or deadman_axes and refuses to start:
+    # "No buttons or axes configured for command 'default'".
+    #
+    # Releasing the deadman therefore stops publication rather than publishing a
+    # stop. That is safe, and it is what stops the car: with no new command,
+    # ackermann_to_vesc sends nothing, and the VESC's own command timeout
+    # (App Settings -> General) cuts the motor. Check that timeout is set before
+    # relying on it.
 
     # Hold LB to drive.
     human_control:

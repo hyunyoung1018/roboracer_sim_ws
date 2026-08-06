@@ -245,6 +245,12 @@ than measured.
       roll=pi in `albomb_sensors.xacro` and re-check the yaw sign, since the
       flip changes it.
 - [ ] Pin the VESC serial port with a udev rule; `/dev/ttyACM0` moves on reboot.
+      Give the rule `MODE="0666"` and it also covers the dialout group, which a
+      fresh flash does not put you in - the symptom is
+      `open: Permission denied` from vesc_driver.
+- [ ] Set the VESC's own command timeout (App Settings, General). Releasing the
+      joystick deadman stops publication rather than sending zeros, so that
+      timeout is what actually stops the car.
 - [ ] Match the simulated LiDAR to the real one in `sim.yaml` if it drifts —
       1081 beams, 0.06–10 m, ±135°.
 
