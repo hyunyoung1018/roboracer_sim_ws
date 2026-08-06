@@ -269,6 +269,19 @@ class RacelineGenerator(Node):
             bound_r=bound_r_water, bound_l=bound_l_water,
             reverse=self.reverse)
 
+        # Make the waypoint at the selected start pose the first point of the
+        # completed reference track. Rotating only after attaching the widths
+        # keeps pixel-space widths paired with their interpolated metric points.
+        start_idx = int(np.argmin(np.hypot(
+            cent_with_dist[:, 0] - start_pose[0],
+            cent_with_dist[:, 1] - start_pose[1])))
+        cent_with_dist = np.roll(cent_with_dist, -start_idx, axis=0)
+        start_distance = np.hypot(cent_with_dist[0, 0] - start_pose[0],
+                                  cent_with_dist[0, 1] - start_pose[1])
+        self.get_logger().info(
+            f'Centerline index 0 aligned to start pose '
+            f'(distance {start_distance:.3f}m)')
+
         track_csv = map_io.write_centerline_csv(self.map_dir, cent_with_dist)
         self.get_logger().info(f'Wrote reference track: {track_csv}')
 
