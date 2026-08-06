@@ -85,11 +85,16 @@ pip install "gymnasium>=0.29.1,<0.30" "numba>=0.59.0" "pandas>=2.0.0" \
 pip install --no-deps -r requirements.txt
 
 # 6. range_libc, for the particle filter. Cython extension, not a pip package.
-#    Add compile_with_cuda.sh instead of setup.py on the Jetson for the much
-#    faster rmgpu ray casting (then set range_method in localize.yaml).
-git clone https://github.com/f1tenth/range_libc /tmp/range_libc
+#    --no-build-isolation is required: the repo has no pyproject.toml, so pip
+#    would build in a clean environment where the cython just installed is not
+#    visible. Do NOT use its compile.sh, which runs sudo and would install to
+#    the system python rather than this venv.
 pip install cython
-cd /tmp/range_libc/pywrappers && python setup.py install && cd -
+git clone https://github.com/f1tenth/range_libc /tmp/range_libc
+cd /tmp/range_libc/pywrapper && pip install --no-build-isolation . && cd -
+#    On the Jetson, for the much faster rmgpu ray casting (then set
+#    range_method: 'rmgpu' in config/car/pf.yaml):
+#      WITH_CUDA=ON pip install --no-build-isolation .
 
 # 7. build - `python -m colcon`, never bare `colcon`
 python -m colcon build --symlink-install
