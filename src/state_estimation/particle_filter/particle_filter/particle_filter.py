@@ -34,10 +34,11 @@ from particle_filter import utils as Utils
 # TF
 # import tf.transformations
 # import tf
-from tf2_ros import TransformBroadcaster
+from tf2_ros import TransformBroadcaster, Buffer, TransformListener
 import tf_transformations
 
 # messages
+from rclpy.qos import qos_profile_sensor_data
 from std_msgs.msg import String, Header, Float32MultiArray
 from sensor_msgs.msg import LaserScan
 from visualization_msgs.msg import Marker
@@ -74,6 +75,15 @@ class ParticleFiler(Node):
         self.declare_parameter('rangelib_variant')
         self.declare_parameter('fine_timing')
         self.declare_parameter('publish_odom')
+        # Default matters: the parameter must not be required. False is also the
+        # right default here - the EKF downstream owns map -> base_link, and if
+        # the filter published map -> laser as well, laser would have two parents
+        # (the URDF already gives base_link -> laser) and TF would reject it.
+        self.declare_parameter('publish_tf', False)
+        # Frame names come from albomb_description, not from upstream's defaults.
+        self.declare_parameter('map_frame', 'map')
+        self.declare_parameter('base_frame', 'ego_racecar/base_link')
+        self.declare_parameter('laser_frame', 'ego_racecar/laser')
         self.declare_parameter('viz')
         self.declare_parameter('z_short')
         self.declare_parameter('z_max')
@@ -97,6 +107,10 @@ class ParticleFiler(Node):
         self.RANGELIB_VAR         = self.get_parameter('rangelib_variant').value
         self.SHOW_FINE_TIMING     = self.get_parameter('fine_timing').value
         self.PUBLISH_ODOM         = self.get_parameter('publish_odom').value
+        self.PUBLISH_TF           = self.get_parameter('publish_tf').value
+        self.MAP_FRAME            = self.get_parameter('map_frame').value
+        self.BASE_FRAME           = self.get_parameter('base_frame').value
+        self.LASER_FRAME          = self.get_parameter('laser_frame').value
         self.DO_VIZ               = self.get_parameter('viz').value
 
         # sensor model constants
@@ -119,7 +133,9 @@ class ParticleFiler(Node):
         self.map_info = None
         self.map_initialized = False
         self.lidar_initialized = False
-        self.odom_initialized = False
+        # velocity motion model is integrated in lidarCB, so the filter no longer
+        # requires odom to have arrived; velocities default to 0 (= no motion).
+        self.odom_initialized = True
         self.last_pose = None
         self.laser_angles = None
         self.downsampled_angles = None
@@ -153,8 +169,10 @@ class ParticleFiler(Node):
         self.precompute_sensor_model()
         self.initialize_global()
 
-        # keep track of speed from input odom
-        self.current_speed = 0.0
+        # keep track of velocity from input odom; integrated over the scan dt
+        self.current_speed   = 0.0   # twist.linear.x  (body forward velocity)
+        self.current_angular = 0.0   # twist.angular.z (yaw rate)
+        self.last_scan_time  = None  # float secs of the previous scan, for dt
 
         # Pub Subs
         # these topics are for visualization
@@ -165,16 +183,25 @@ class ParticleFiler(Node):
 
         if self.PUBLISH_ODOM:
             self.odom_pub = self.create_publisher(Odometry, '/pf/pose/odom', 1)
+            # MCL estimates the LASER pose; /pf/pose/odom must report the BASE_LINK
+            # pose (robot_localization fuses an odom pose as base_link's and ignores
+            # child_frame_id for the pose). Look up the static base_link->laser
+            # transform (lazily, once TF is up) to convert laser pose -> base_link.
+            self.tf_buffer = Buffer()
+            self.tf_listener = TransformListener(self.tf_buffer, self)
+            self.bl2laser = None          # (dx, dy, dyaw): laser expressed in base_link
+            self._bl2laser_warned = False
 
         # these topics are for coordinate space things
-        self.pub_tf = TransformBroadcaster(self)
+        if self.PUBLISH_TF:
+            self.pub_tf = TransformBroadcaster(self)    
 
         # these topics are to receive data from the racecar
         self.laser_sub = self.create_subscription(
             LaserScan,
             self.get_parameter('scan_topic').value,
             self.lidarCB,
-            1)
+            qos_profile_sensor_data)
         self.odom_sub = self.create_subscription(
             Odometry,
             self.get_parameter('odometry_topic').value,
@@ -235,35 +262,81 @@ class ParticleFiler(Node):
         self.permissible_region[array_255==0] = 1
         self.map_initialized = True
 
+    def _ensure_bl2laser(self):
+        '''Lazily look up the static base_link->laser transform (laser pose in the
+        base_link frame) and cache it. Returns True once available.'''
+        if self.bl2laser is not None:
+            return True
+        try:
+            tf = self.tf_buffer.lookup_transform(self.BASE_FRAME, self.LASER_FRAME, rclpy.time.Time())
+            t = tf.transform.translation
+            q = tf.transform.rotation
+            yaw = tf_transformations.euler_from_quaternion([q.x, q.y, q.z, q.w])[2]
+            self.bl2laser = (t.x, t.y, yaw)
+            self.get_logger().info(
+                f"[pf] base_link->laser offset = ({t.x:.3f}, {t.y:.3f}, {yaw:.3f} rad)")
+            return True
+        except Exception as e:
+            if not self._bl2laser_warned:
+                self.get_logger().warn(
+                    f"[pf] base_link->laser TF not available yet ({e}); "
+                    "publishing laser pose on /pf/pose/odom until it appears")
+                self._bl2laser_warned = True
+            return False
+
+    def _laser_pose_to_base_link(self, pose):
+        '''Convert a (x, y, yaw) LASER pose in map to the BASE_LINK pose in map,
+        using the cached static base_link->laser offset.
+        T_map_base = T_map_laser . (T_base_laser)^-1'''
+        dx, dy, dyaw = self.bl2laser
+        xl, yl, thl = pose[0], pose[1], pose[2]
+        c, s = np.cos(dyaw), np.sin(dyaw)
+        ix = -(c * dx + s * dy)            # inverse of base_link->laser
+        iy = -(-s * dx + c * dy)
+        ith = -dyaw
+        cl, sl = np.cos(thl), np.sin(thl)
+        xb = xl + cl * ix - sl * iy
+        yb = yl + sl * ix + cl * iy
+        thb = thl + ith
+        return xb, yb, thb
+
     def publish_tf(self, pose, stamp=None):
         ''' Publish a tf for the car. This tells ROS where the car is with respect to the map. '''
         if stamp == None:
             stamp = self.get_clock().now().to_msg()
-
-        t = TransformStamped()
-        # header
-        t.header.stamp = stamp
-        t.header.frame_id = '/map'
-        t.child_frame_id = '/laser'
-        # translation
-        t.transform.translation.x = pose[0]
-        t.transform.translation.y = pose[1]
-        t.transform.translation.z = 0.0
-        q = tf_transformations.quaternion_from_euler(0., 0., pose[2])
-        # rotation
-        t.transform.rotation.x = q[0]
-        t.transform.rotation.y = q[1]
-        t.transform.rotation.z = q[2]
-        t.transform.rotation.w = q[3]
-        self.pub_tf.sendTransform(t)
+        if self.PUBLISH_TF:
+            t = TransformStamped()
+            # header
+            t.header.stamp = stamp
+            t.header.frame_id = self.MAP_FRAME
+            t.child_frame_id = self.LASER_FRAME
+            # translation
+            t.transform.translation.x = pose[0]
+            t.transform.translation.y = pose[1]
+            t.transform.translation.z = 0.0
+            q = tf_transformations.quaternion_from_euler(0., 0., pose[2])
+            # rotation
+            t.transform.rotation.x = q[0]
+            t.transform.rotation.y = q[1]
+            t.transform.rotation.z = q[2]
+            t.transform.rotation.w = q[3]
+            self.pub_tf.sendTransform(t)
         # also publish odometry to facilitate getting the localization pose
         if self.PUBLISH_ODOM:
+            # pose is the LASER pose in map; convert to BASE_LINK so consumers
+            # (e.g. robot_localization, which fuses an odom pose as base_link's) get
+            # the correct frame. Falls back to the laser pose until the TF is up.
+            if self._ensure_bl2laser():
+                bx, by, byaw = self._laser_pose_to_base_link(pose)
+            else:
+                bx, by, byaw = pose[0], pose[1], pose[2]
             odom = Odometry()
             odom.header.stamp = self.get_clock().now().to_msg()
-            odom.header.frame_id = '/map'
-            odom.pose.pose.position.x = pose[0]
-            odom.pose.pose.position.y = pose[1]
-            odom.pose.pose.orientation = Utils.angle_to_quaternion(pose[2])
+            odom.header.frame_id = self.MAP_FRAME
+            odom.child_frame_id = self.BASE_FRAME
+            odom.pose.pose.position.x = bx
+            odom.pose.pose.position.y = by
+            odom.pose.pose.orientation = Utils.angle_to_quaternion(byaw)
             cov_mat = np.cov(self.particles, rowvar=False, ddof=0, aweights=self.weights).flatten()
             odom.pose.covariance[:cov_mat.shape[0]] = cov_mat
             odom.twist.twist.linear.x = self.current_speed
@@ -319,12 +392,12 @@ class ParticleFiler(Node):
         ls = LaserScan()
         ls.header.stamp = self.last_stamp
         ls.header.frame_id = '/laser'
-        ls.angle_min = np.min(angles)
-        ls.angle_max = np.max(angles)
-        ls.angle_increment = np.abs(angles[0] - angles[1])
-        ls.range_min = 0
-        ls.range_max = np.max(ranges)
-        ls.ranges = ranges
+        ls.angle_min = float(np.min(angles))
+        ls.angle_max = float(np.max(angles))
+        ls.angle_increment = float(np.abs(angles[0] - angles[1]))
+        ls.range_min = 0.0
+        ls.range_max = float(np.max(ranges))
+        ls.ranges = ranges.tolist()
         self.pub_fake_scan.publish(ls)
 
     def lidarCB(self, msg):
@@ -342,38 +415,31 @@ class ParticleFiler(Node):
         # store the necessary scanner information for later processing
         self.downsampled_ranges = np.array(msg.ranges[::self.ANGLE_STEP])
         self.lidar_initialized = True
-        # self.update()
+
+        # Velocity motion model: integrate the latest odom twist over the interval
+        # since the previous scan -> body-frame delta [dx, dy(~0 on a car), dtheta].
+        # update() consumes self.odometry_data and zeroes it, so we recompute it
+        # fresh from velocity * dt on every scan.
+        scan_time = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
+        if self.last_scan_time is not None:
+            dt = scan_time - self.last_scan_time
+            if dt > 0.0:
+                self.odometry_data = np.array(
+                    [self.current_speed * dt, 0.0, self.current_angular * dt])
+        self.last_scan_time = scan_time
+        self.last_stamp = msg.header.stamp
+
+        self.update()
 
     def odomCB(self, msg):
         '''
-        Store deltas between consecutive odometry messages in the coordinate space of the car.
-
-        Odometry data is accumulated via dead reckoning, so it is very inaccurate on its own.
+        Store the latest body-frame velocity (vx) and yaw rate (wz) from the odom
+        twist. The motion is integrated over the scan interval in lidarCB, so this
+        callback no longer computes position deltas or triggers an MCL update.
         '''
-        position = np.array([
-            msg.pose.pose.position.x,
-            msg.pose.pose.position.y])
-
-        orientation = Utils.quaternion_to_angle(msg.pose.pose.orientation)
-        pose = np.array([position[0], position[1], orientation])
-        self.current_speed = msg.twist.twist.linear.x
-
-        if isinstance(self.last_pose, np.ndarray):
-            # changes in x,y,theta in local coordinate system of the car
-            rot = Utils.rotation_matrix(-self.last_pose[2])
-            delta = np.array([position - self.last_pose[0:2]]).transpose()
-            local_delta = (rot*delta).transpose()
-            
-            self.odometry_data = np.array([local_delta[0,0], local_delta[0,1], orientation - self.last_pose[2]])
-            self.last_pose = pose
-            self.last_stamp = msg.header.stamp
-            self.odom_initialized = True
-        else:
-            self.get_logger().info('...Received first Odometry message')
-            self.last_pose = pose
-
-        # this topic is slower than lidar, so update every time we receive a message
-        self.update()
+        self.current_speed   = msg.twist.twist.linear.x
+        self.current_angular = msg.twist.twist.angular.z
+        self.odom_initialized = True
 
     def clicked_pose(self, msg):
         '''

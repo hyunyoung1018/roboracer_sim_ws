@@ -1,0 +1,58 @@
+# Particle filter localisation, from UNIST's tuning of the f1tenth filter.
+#
+# It localises the LASER and converts to base_link through the static URDF
+# transform, so the frames below have to name links that albomb_description
+# actually publishes.
+#
+# publish_tf is false on purpose. The EKF downstream owns map -> base_link; if
+# the filter also published map -> laser then laser would have two parents,
+# because the URDF already gives base_link -> laser, and TF would reject the
+# tree. (UNIST's config misspells this key as `publis_tf`, so it never takes
+# effect there - ours is spelled correctly and the node defaults it to false.)
+
+particle_filter:
+  ros__parameters:
+    scan_topic: '/scan'
+    # Wheel odometry drives the motion model; the scan corrects it.
+    odometry_topic: '/vesc/odom'
+
+    publish_tf: false
+    map_frame: 'map'
+    base_frame: 'ego_racecar/base_link'
+    laser_frame: 'ego_racecar/laser'
+
+    # Every 18th beam. The UST-10LX returns 1081, so the filter weighs ~60 per
+    # particle - enough to localise, cheap enough to run 2000 particles.
+    angle_step: 18
+    max_particles: 2000
+    squash_factor: 2.2
+
+    viz: 1
+    max_viz_particles: 60
+
+    # Ray casting. 'rm' and 'cddt' are CPU; 'rmgpu' needs range_libc built with
+    # CUDA and is much faster - worth doing on the Jetson if the filter cannot
+    # keep up. Check with: ros2 topic hz /pf/pose/odom
+    range_method: 'rm'
+    theta_discretization: 112
+
+    # Matches the UST-10LX's guaranteed range.
+    max_range: 10
+    fine_timing: 0
+    publish_odom: 1
+
+    z_short: 0.01
+    z_max: 0.07
+    z_rand: 0.12
+    z_hit: 0.75
+    sigma_hit: 8.0
+
+    # x and y equal on purpose: the noise is added in the map frame, so unequal
+    # values would tie position uncertainty to the map axes rather than to the
+    # car, making the filter behave differently depending on how the track was
+    # mapped. Too little noise diverges at speed, so both take the larger value.
+    motion_dispersion_x: 0.05
+    motion_dispersion_y: 0.05
+    motion_dispersion_theta: 0.25
+
+    rangelib_variant: 2

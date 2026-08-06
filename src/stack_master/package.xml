@@ -44,7 +44,7 @@
 
   <!-- localization.launch.xml -->
   <exec_depend>particle_filter</exec_depend>
-  <exec_depend>state_estimation</exec_depend>
+  <exec_depend>frenet_odom_republisher</exec_depend>
 
   <!-- base_system.launch.xml -->
   <exec_depend>raceline</exec_depend>

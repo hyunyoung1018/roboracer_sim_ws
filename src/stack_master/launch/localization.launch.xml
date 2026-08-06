@@ -3,33 +3,33 @@
   localization.launch.xml - know where the car is on a saved map.
 
   Everything above this needs it: the controller follows a raceline in map
-  coordinates, so without a map -> base_link transform nothing downstream can
-  run at all.
+  coordinates, so without map -> ego_racecar/base_link nothing downstream runs.
 
       ros2 launch stack_master localization.launch.xml map:=<name>
 
   What comes up:
 
       map_server        serves maps/<map>/<map>.yaml
-      particle_filter   /scan + /vesc/odom -> map -> ego_racecar/base_link TF
-      carstate_node     that TF + a velocity source -> /car_state/*
+      particle_filter   /scan against that map      -> /pf/pose/odom
+      ekf_localization  that + /vesc/odom           -> /car_state/odom + TF
+      frenet_odom_republisher                       -> /car_state/frenet/*
+      raceline_publisher                            -> /global_waypoints
 
-  The split matters: carstate_node takes the POSE from TF and the TWIST from an
-  odometry topic, then republishes both as /car_state/odom, /car_state/pose and
-  their Frenet equivalents. Frenet needs /global_waypoints, so raceline
-  generation has to have run for this map first.
+  Structure follows UNIST's localization launch. The two-source EKF is the part
+  worth understanding: the particle filter contributes position and heading
+  only, the VESC contributes forward speed and yaw rate only, and neither is
+  asked for what it is bad at. See config/car/ekf_pf.yaml.
 
-  Velocity comes straight from /vesc/odom. race_stack feeds an EKF-fused topic
-  here instead; that is worth adding if the wheel velocity proves too noisy to
-  control on, but it is one more thing to get wrong and the VESC's own speed
-  estimate is reasonable above its openloop floor - which is where racing
-  happens anyway. config/common/ekf.yaml is still there for that.
+  TF ownership: the EKF publishes map -> ego_racecar/base_link. The particle
+  filter's own publish_tf stays false, and cartographer must not be running -
+  mapping and localisation both claim that edge.
 
-  PREREQUISITE: particle_filter needs range_libc, which is a Cython extension
-  built from source, not a pip package. See README.
+  PREREQUISITE: particle_filter needs range_libc, a Cython extension built from
+  source rather than a pip package. See README.
 
-  Give the filter an initial pose with RViz's "2D Pose Estimate" once it is up -
-  it does not know where the car started.
+  The filter does not know where the car started. Give it a guess with RViz's
+  "2D Pose Estimate", or publish a PointStamped on /pf_global_initialize to make
+  it re-run a full global search.
 -->
 <launch>
   <arg name="map" description="Map name (folder under stack_master/maps/)"/>
@@ -39,8 +39,9 @@
        description="Also publish /car_state/frenet/*. Needs global_waypoints.json."/>
   <arg name="use_sim_time" default="false"/>
 
-  <let name="maps_dir" value="$(find-pkg-share stack_master)/maps"/>
-  <let name="map_dir"  value="$(var maps_dir)/$(var map)"/>
+  <let name="maps_dir"   value="$(find-pkg-share stack_master)/maps"/>
+  <let name="map_dir"    value="$(var maps_dir)/$(var map)"/>
+  <let name="config_dir" value="$(find-pkg-share stack_master)/config/car"/>
 
   <!-- ===== drivers ===== -->
   <group if="$(var hardware)">
@@ -50,6 +51,8 @@
   <!-- ===== the map to localise against ===== -->
   <node pkg="nav2_map_server" exec="map_server" name="map_server" output="screen">
     <param name="yaml_filename" value="$(var map_dir)/$(var map).yaml"/>
+    <param name="topic"    value="map"/>
+    <param name="frame_id" value="map"/>
     <param name="use_sim_time" value="$(var use_sim_time)"/>
   </node>
   <node pkg="nav2_lifecycle_manager" exec="lifecycle_manager"
@@ -60,23 +63,34 @@
   </node>
 
   <!-- ===== particle filter ===== -->
-  <!-- Owns map -> ego_racecar/base_link while racing, the way cartographer owns
-       it while mapping. Never run this and mapping.launch.xml together. -->
+  <!-- /clicked_point is remapped away on purpose: the filter treats any
+       PointStamped there as "re-run global initialisation", and /clicked_point
+       is a generic RViz topic that anything might publish to. Scattering every
+       particle mid-run because someone clicked in RViz is not a failure mode
+       worth keeping. Publish to /pf_global_initialize to do it deliberately. -->
   <node pkg="particle_filter" exec="particle_filter" name="particle_filter" output="screen">
-    <param from="$(find-pkg-share particle_filter)/config/localize.yaml"/>
+    <param from="$(var config_dir)/pf.yaml"/>
     <param name="use_sim_time" value="$(var use_sim_time)"/>
+    <remap from="/clicked_point" to="/pf_global_initialize"/>
   </node>
 
-  <!-- ===== /car_state/* ===== -->
-  <node pkg="state_estimation" exec="carstate_node" name="carstate_node" output="screen">
-    <param name="frenet_bool" value="$(var frenet)"/>
+  <!-- ===== the fused state ===== -->
+  <!-- Node name must stay ekf_localization: that is the key ekf_pf.yaml uses. -->
+  <node pkg="robot_localization" exec="ekf_node" name="ekf_localization" output="screen">
+    <param from="$(var config_dir)/ekf_pf.yaml"/>
     <param name="use_sim_time" value="$(var use_sim_time)"/>
+    <remap from="odometry/filtered" to="/car_state/odom"/>
   </node>
 
-  <!-- ===== the raceline, so Frenet has waypoints to work against ===== -->
-  <node pkg="raceline" exec="raceline_publisher" name="raceline_publisher" output="screen"
-        if="$(var frenet)">
-    <param name="map_dir" value="$(var map_dir)"/>
-    <param name="use_sim_time" value="$(var use_sim_time)"/>
-  </node>
+  <!-- ===== Frenet coordinates along the raceline ===== -->
+  <group if="$(var frenet)">
+    <node pkg="raceline" exec="raceline_publisher" name="raceline_publisher" output="screen">
+      <param name="map_dir" value="$(var map_dir)"/>
+      <param name="use_sim_time" value="$(var use_sim_time)"/>
+    </node>
+    <node pkg="frenet_odom_republisher" exec="frenet_odom_republisher_node"
+          name="frenet_odom_republisher" output="screen">
+      <param name="use_sim_time" value="$(var use_sim_time)"/>
+    </node>
+  </group>
 </launch>
