@@ -1,0 +1,82 @@
+<?xml version="1.0"?>
+<!--
+  localization.launch.xml - know where the car is on a saved map.
+
+  Everything above this needs it: the controller follows a raceline in map
+  coordinates, so without a map -> base_link transform nothing downstream can
+  run at all.
+
+      ros2 launch stack_master localization.launch.xml map:=<name>
+
+  What comes up:
+
+      map_server        serves maps/<map>/<map>.yaml
+      particle_filter   /scan + /vesc/odom -> map -> ego_racecar/base_link TF
+      carstate_node     that TF + a velocity source -> /car_state/*
+
+  The split matters: carstate_node takes the POSE from TF and the TWIST from an
+  odometry topic, then republishes both as /car_state/odom, /car_state/pose and
+  their Frenet equivalents. Frenet needs /global_waypoints, so raceline
+  generation has to have run for this map first.
+
+  Velocity comes straight from /vesc/odom. race_stack feeds an EKF-fused topic
+  here instead; that is worth adding if the wheel velocity proves too noisy to
+  control on, but it is one more thing to get wrong and the VESC's own speed
+  estimate is reasonable above its openloop floor - which is where racing
+  happens anyway. config/common/ekf.yaml is still there for that.
+
+  PREREQUISITE: particle_filter needs range_libc, which is a Cython extension
+  built from source, not a pip package. See README.
+
+  Give the filter an initial pose with RViz's "2D Pose Estimate" once it is up -
+  it does not know where the car started.
+-->
+<launch>
+  <arg name="map" description="Map name (folder under stack_master/maps/)"/>
+  <arg name="hardware" default="true"
+       description="Bring up the drivers. false if they are already running."/>
+  <arg name="frenet" default="true"
+       description="Also publish /car_state/frenet/*. Needs global_waypoints.json."/>
+  <arg name="use_sim_time" default="false"/>
+
+  <let name="maps_dir" value="$(find-pkg-share stack_master)/maps"/>
+  <let name="map_dir"  value="$(var maps_dir)/$(var map)"/>
+
+  <!-- ===== drivers ===== -->
+  <group if="$(var hardware)">
+    <include file="$(find-pkg-share stack_master)/launch/hardware.launch.xml"/>
+  </group>
+
+  <!-- ===== the map to localise against ===== -->
+  <node pkg="nav2_map_server" exec="map_server" name="map_server" output="screen">
+    <param name="yaml_filename" value="$(var map_dir)/$(var map).yaml"/>
+    <param name="use_sim_time" value="$(var use_sim_time)"/>
+  </node>
+  <node pkg="nav2_lifecycle_manager" exec="lifecycle_manager"
+        name="lifecycle_manager_localization" output="screen">
+    <param name="autostart"  value="true"/>
+    <param name="node_names" value="[map_server]"/>
+    <param name="use_sim_time" value="$(var use_sim_time)"/>
+  </node>
+
+  <!-- ===== particle filter ===== -->
+  <!-- Owns map -> ego_racecar/base_link while racing, the way cartographer owns
+       it while mapping. Never run this and mapping.launch.xml together. -->
+  <node pkg="particle_filter" exec="particle_filter" name="particle_filter" output="screen">
+    <param from="$(find-pkg-share particle_filter)/config/localize.yaml"/>
+    <param name="use_sim_time" value="$(var use_sim_time)"/>
+  </node>
+
+  <!-- ===== /car_state/* ===== -->
+  <node pkg="state_estimation" exec="carstate_node" name="carstate_node" output="screen">
+    <param name="frenet_bool" value="$(var frenet)"/>
+    <param name="use_sim_time" value="$(var use_sim_time)"/>
+  </node>
+
+  <!-- ===== the raceline, so Frenet has waypoints to work against ===== -->
+  <node pkg="raceline" exec="raceline_publisher" name="raceline_publisher" output="screen"
+        if="$(var frenet)">
+    <param name="map_dir" value="$(var map_dir)"/>
+    <param name="use_sim_time" value="$(var use_sim_time)"/>
+  </node>
+</launch>

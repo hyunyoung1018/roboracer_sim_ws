@@ -84,11 +84,18 @@ pip install "gymnasium>=0.29.1,<0.30" "numba>=0.59.0" "pandas>=2.0.0" \
 # 5. the optimizer's solvers
 pip install --no-deps -r requirements.txt
 
-# 6. build - `python -m colcon`, never bare `colcon`
+# 6. range_libc, for the particle filter. Cython extension, not a pip package.
+#    Add compile_with_cuda.sh instead of setup.py on the Jetson for the much
+#    faster rmgpu ray casting (then set range_method in localize.yaml).
+git clone https://github.com/f1tenth/range_libc /tmp/range_libc
+pip install cython
+cd /tmp/range_libc/pywrappers && python setup.py install && cd -
+
+# 7. build - `python -m colcon`, never bare `colcon`
 python -m colcon build --symlink-install
 source install/setup.bash
 
-# 7. verify
+# 8. verify
 python -c "from f1tenth_gym.envs import F110Env; print('gym OK')"
 python -c "from raceline.raceline_generator import trajectory_optimizer; print('raceline OK')"
 ros2 launch f1tenth_gym_ros unita_gym_bridge_launch.py
@@ -111,6 +118,10 @@ ros2 launch f1tenth_gym_ros unita_gym_bridge_launch.py
 ros2 launch stack_master mapping.launch.xml map:=<name>
 #   drive with the F710 (hold LB), then from another terminal:
 ros2 service call /finish_mapping std_srvs/srv/Trigger {}
+
+# localisation on a saved map - everything above it needs this
+ros2 launch stack_master localization.launch.xml map:=<name>
+#   give it a starting guess with RViz "2D Pose Estimate"
 
 # raceline from an existing map
 ros2 launch stack_master raceline_generator.launch.xml map:=<name>

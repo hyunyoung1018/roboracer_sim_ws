@@ -42,6 +42,10 @@
   <exec_depend>nav2_map_server</exec_depend>
   <exec_depend>nav2_lifecycle_manager</exec_depend>
 
+  <!-- localization.launch.xml -->
+  <exec_depend>particle_filter</exec_depend>
+  <exec_depend>state_estimation</exec_depend>
+
   <!-- base_system.launch.xml -->
   <exec_depend>raceline</exec_depend>
   <exec_depend>sector_tuner</exec_depend>
