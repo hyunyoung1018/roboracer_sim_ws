@@ -77,9 +77,17 @@ rosdep install --from-paths src --ignore-src -y
 
 # 4. the vendored simulator, without its renderer
 pip install -e src/f1tenth_gym_ros/f1tenth_gym --no-deps
-pip install "gymnasium>=0.29.1,<0.30" "numba>=0.59.0" "pandas>=2.0.0" \
-            "pillow>=9.1.0" "requests>=2.31.0" "scipy>=1.13.0" \
-            "yamldataclassconfig>=1.5.0,<2"
+pip install "numpy<2" "gymnasium>=0.29.1,<0.30" "numba>=0.59.0,<0.61" \
+            "pandas>=2.0.0" "pillow>=9.1.0" "requests>=2.31.0" \
+            "scipy>=1.13.0" "yamldataclassconfig>=1.5.0,<2"
+
+**`numpy<2` is the one that matters.** `skimage` and `opencv` come from apt,
+built against numpy 1.x. A pip numpy 2 in the venv shadows apt's copy and breaks
+every one of them at import - `numpy.dtype size changed` from skimage,
+`_ARRAY_API not found` from cv2. Nothing here needs numpy 2. `numba<0.61`
+follows: 0.61 and later require it, and 0.66 additionally wants a newer
+`coverage` than apt ships and dies on `module 'coverage' has no attribute
+'types'`.
 
 # 5. the optimizer's solvers
 pip install --no-deps -r requirements.txt

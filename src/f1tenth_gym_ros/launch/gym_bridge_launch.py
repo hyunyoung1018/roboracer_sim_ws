@@ -29,6 +29,7 @@ from launch.actions import DeclareLaunchArgument, ExecuteProcess, LogInfo, SetLa
 from launch.conditions import IfCondition, LaunchConfigurationEquals
 from launch.substitutions import Command, LaunchConfiguration
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 from ament_index_python.packages import get_package_share_directory
 
 
@@ -191,10 +192,10 @@ def generate_launch_description():
         executable='robot_state_publisher',
         name='ego_robot_state_publisher',
         parameters=[
-            {'robot_description': Command([
+            {'robot_description': ParameterValue(Command([
                 'xacro ',
                 os.path.join(get_package_share_directory('f1tenth_gym_ros'), 'urdf', ego_xacro)
-            ])},
+            ]), value_type=str)},
             {'use_sim_time': use_sim_time},
         ],
         remappings=[('/robot_description', 'ego_robot_description')]
@@ -204,10 +205,10 @@ def generate_launch_description():
         executable='robot_state_publisher',
         name='opp_robot_state_publisher',
         parameters=[
-            {'robot_description': Command([
+            {'robot_description': ParameterValue(Command([
                 'xacro ',
                 os.path.join(get_package_share_directory('f1tenth_gym_ros'), 'urdf', 'opp_racecar.xacro')
-            ])},
+            ]), value_type=str)},
             {'use_sim_time': use_sim_time},
         ],
         remappings=[('/robot_description', 'opp_robot_description')]

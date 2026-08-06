@@ -35,6 +35,10 @@
 # It pins numpy==1.18.1 / matplotlib==3.3.1 from 2020 and will fight the system
 # packages. Its real content is reproduced below at working versions.
 
+# NEVER let numpy 2 into this venv. scikit-image and opencv come from apt,
+# built against numpy 1.x; a pip numpy 2 shadows apt's copy and breaks both at
+# import. README step 4 pins numpy<2 for this reason.
+
 # --- Global raceline optimization (raceline package) ---
 # The solvers behind mincurv_iqp and shortest_path.
 #
