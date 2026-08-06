@@ -20,9 +20,15 @@
   only, the VESC contributes forward speed and yaw rate only, and neither is
   asked for what it is bad at. See config/car/ekf_pf.yaml.
 
-  TF ownership: the EKF publishes map -> ego_racecar/base_link. The particle
-  filter's own publish_tf stays false, and cartographer must not be running -
-  mapping and localisation both claim that edge.
+  TF ownership, REP-105:
+
+      map  -> odom        ekf_localization
+      odom -> base_link   vesc_to_odom (hardware.launch.xml odom_tf:=true)
+      base_link -> laser  albomb's URDF
+
+  The particle filter's own publish_tf stays false - it contributes a pose
+  measurement, not a transform. Cartographer must not be running: it claims
+  map -> base_link outright and the two arrangements cannot coexist.
 
   PREREQUISITE: particle_filter needs range_libc, a Cython extension built from
   source rather than a pip package. See README.
@@ -54,7 +60,11 @@
 
   <!-- ===== drivers ===== -->
   <group if="$(var hardware)">
-    <include file="$(find-pkg-share stack_master)/launch/hardware.launch.xml"/>
+    <include file="$(find-pkg-share stack_master)/launch/hardware.launch.xml">
+      <!-- Closes the TF chain: the EKF publishes map -> odom, this fills in
+           odom -> ego_racecar/base_link between corrections. -->
+      <arg name="odom_tf" value="true"/>
+    </include>
   </group>
 
   <!-- ===== the map to localise against ===== -->

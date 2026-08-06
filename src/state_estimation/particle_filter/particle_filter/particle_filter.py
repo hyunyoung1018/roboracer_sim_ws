@@ -337,8 +337,21 @@ class ParticleFiler(Node):
             odom.pose.pose.position.x = bx
             odom.pose.pose.position.y = by
             odom.pose.pose.orientation = Utils.angle_to_quaternion(byaw)
-            cov_mat = np.cov(self.particles, rowvar=False, ddof=0, aweights=self.weights).flatten()
-            odom.pose.covariance[:cov_mat.shape[0]] = cov_mat
+            # The particle spread is 3x3 over (x, y, yaw); pose.covariance is a
+            # 6x6 over (x, y, z, roll, pitch, yaw) flattened row-major. Writing
+            # the 3x3 into the first nine slots scatters it - yaw variance lands
+            # in the x-z slot and index 35, the one robot_localization reads for
+            # heading, stays zero. A zero variance claims the heading is known
+            # exactly, which is why the filter appeared to lock and stop moving.
+            cov = np.cov(self.particles, rowvar=False, ddof=0, aweights=self.weights)
+            idx = (0, 1, 5)  # x, y, yaw within the 6x6
+            for r in range(3):
+                for c in range(3):
+                    odom.pose.covariance[idx[r] * 6 + idx[c]] = float(cov[r, c])
+            # z, roll and pitch are not observed in 2D. Large rather than zero,
+            # so nothing downstream mistakes them for certainty.
+            for i in (2, 3, 4):
+                odom.pose.covariance[i * 6 + i] = 1e6
             odom.twist.twist.linear.x = self.current_speed
             self.odom_pub.publish(odom)
         

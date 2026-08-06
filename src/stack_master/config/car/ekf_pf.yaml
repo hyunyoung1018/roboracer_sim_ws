@@ -13,10 +13,17 @@
 # both smooth and absolute. Neither source is used for what it is bad at, which
 # is why the config vectors below are so sparse.
 #
-# odom_frame is set to the base link rather than an actual odom frame: with
-# world_frame = map and two_d_mode, that keeps robot_localization publishing a
-# single map -> base_link edge instead of trying to split it through an odom
-# frame that nothing else in this stack maintains.
+# The TF chain is the standard REP-105 one, and it has to be: robot_localization
+# on Humble refuses to start if map_frame, odom_frame and base_link_frame are not
+# all distinct ("Invalid frame configuration!"). UNIST collapses odom_frame onto
+# base_link, which their distro tolerates and ours does not.
+#
+#   map  -> odom          this node, the correction
+#   odom -> base_link     vesc_to_odom, dead reckoning between corrections
+#
+# So vesc_to_odom's publish_tf has to be TRUE while localising. It stays false
+# while mapping, where cartographer owns map -> base_link outright; that is what
+# hardware.launch.xml's odom_tf argument switches.
 
 ekf_localization:
   ros__parameters:
@@ -29,7 +36,7 @@ ekf_localization:
     publish_tf: true
 
     map_frame:       map
-    odom_frame:      ego_racecar/base_link
+    odom_frame:      odom
     base_link_frame: ego_racecar/base_link
     world_frame:     map
 

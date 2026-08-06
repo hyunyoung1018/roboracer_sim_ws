@@ -88,6 +88,8 @@
     <node pkg="vesc_ackermann" exec="vesc_to_odom_node"
           name="vesc_to_odom_node" namespace="vesc" output="screen">
       <param from="$(var config_dir)/vesc.yaml"/>
+      <!-- After the file, so the argument wins. -->
+      <param name="publish_tf" value="$(var odom_tf)"/>
     </node>
   </group>
 
