@@ -81,6 +81,11 @@ pip install "numpy<2" "gymnasium>=0.29.1,<0.30" "numba>=0.59.0,<0.61" \
             "pandas>=2.0.0" "pillow>=9.1.0" "requests>=2.31.0" \
             "scipy>=1.13.0" "yamldataclassconfig>=1.5.0,<2"
 
+`transforms3d` in `requirements.txt` belongs to the same problem: apt's copy
+uses `np.float`, removed in numpy 1.24, and every node that touches
+`tf_transformations` dies on it. There is no numpy that satisfies both apt's
+transforms3d and the gym's `scipy>=1.13`, so the newer transforms3d wins.
+
 **`numpy<2` is the one that matters.** `skimage` and `opencv` come from apt,
 built against numpy 1.x. A pip numpy 2 in the venv shadows apt's copy and breaks
 every one of them at import - `numpy.dtype size changed` from skimage,

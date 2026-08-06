@@ -66,6 +66,18 @@ trajectory_planning_helpers==0.76
 # here that a stale user-site install could shadow.
 quadprog>=0.1.13
 
+# --- Localisation ---
+# apt's python3-transforms3d on 22.04 still calls np.float and
+# np.maximum_sctype, both removed in numpy 1.24, so it raises
+# "module 'numpy' has no attribute 'float'" the moment anything imports it -
+# which on this stack is tf_transformations, and through it the particle filter
+# and the frenet republisher.
+#
+# The fix is a newer transforms3d in the venv, not an older numpy: scipy >= 1.13
+# (required by the gym) wants numpy >= 1.22.4, so there is no numpy version that
+# satisfies both it and apt's transforms3d.
+transforms3d>=0.4.2
+
 # --- Optional ---
 # casadi is only needed for the 'mintime' optimization, which the raceline
 # package never runs (see raceline/optimizer notes and the vendored
