@@ -52,7 +52,12 @@
   <group if="$(var description)">
     <node pkg="robot_state_publisher" exec="robot_state_publisher"
           name="robot_state_publisher">
-      <param name="robot_description"
+      <!-- type="str" is required, not decoration. Without it launch runs the
+           parameter value through a YAML parse, and the URDF is full of things
+           YAML claims for itself - any "key: value" shape inside a comment, for
+           one - so robot_state_publisher fails to start with a yaml error
+           pointing at a line of XML. -->
+      <param name="robot_description" type="str"
              value="$(command 'xacro $(find-pkg-share albomb_description)/urdf/albomb.urdf.xacro')"/>
     </node>
   </group>
