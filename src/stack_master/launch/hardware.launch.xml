@@ -43,6 +43,12 @@
        vesc_port:=/dev/ttyACM0 -->
   <!-- <arg name="vesc_port" default="/dev/sensors/vesc" description="VESC serial port"/> -->
   <arg name="vesc_port" default="/dev/ttyACM0" description="VESC serial port"/>
+  <!-- Whether vesc_to_odom publishes odom -> ego_racecar/base_link.
+       false while mapping: cartographer owns map -> base_link outright and a
+       second parent for base_link breaks the tree.
+       true while localising: the EKF publishes map -> odom and this closes the
+       chain to the car. localization.launch.xml passes true. -->
+  <arg name="odom_tf" default="false" description="Publish odom -> base_link from wheel odometry"/>
 
   <let name="config_dir" value="$(find-pkg-share stack_master)/config/car"/>
 
