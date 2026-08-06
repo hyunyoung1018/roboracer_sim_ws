@@ -16,6 +16,14 @@
 #
 # Everything below sits under /** so all three vesc nodes share it.
 
+# NODE KEYS ARE WILDCARDED ON PURPOSE. hardware.launch.xml puts these nodes in
+# the /vesc namespace, so their fully qualified names are /vesc/vesc_driver_node
+# and /vesc/vesc_to_odom_node. A bare `vesc_to_odom_node:` key does not match a
+# namespaced node - the section is silently ignored and every parameter in it
+# falls back to the code default. That is not a cosmetic failure: wheelbase
+# defaults to 0.0, and vesc_to_odom divides by it, so the odometry came out NaN
+# and poisoned the whole TF tree.
+
 /**:
   ros__parameters:
     # erpm = speed_to_erpm_gain * speed[m/s] + speed_to_erpm_offset
@@ -46,7 +54,7 @@
     servo_min: 0.15
     servo_max: 0.85
 
-vesc_to_odom_node:
+/**/vesc_to_odom_node:
   ros__parameters:
     odom_frame: odom
     base_frame: ego_racecar/base_link
@@ -66,7 +74,7 @@ vesc_to_odom_node:
     # From albomb_description/urdf/albomb_core.xacro (wheel_base).
     wheelbase: 0.324
 
-vesc_driver_node:
+/**/vesc_driver_node:
   ros__parameters:
     # Stamped on both IMU messages. Must name a link that exists in albomb's
     # URDF, because cartographer resolves it against tracking_frame and
