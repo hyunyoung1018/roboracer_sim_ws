@@ -27,9 +27,13 @@
   PREREQUISITE: particle_filter needs range_libc, a Cython extension built from
   source rather than a pip package. See README.
 
-  The filter does not know where the car started. Give it a guess with RViz's
-  "2D Pose Estimate", or publish a PointStamped on /pf_global_initialize to make
-  it re-run a full global search.
+  The filter does not know where the car started, so it needs a viewer either
+  way: place the car with RViz's "2D Pose Estimate", or with Foxglove's publish
+  tool on /initialpose. Publishing a PointStamped on /pf_global_initialize
+  instead makes it re-run a full global search.
+
+  Watch /pf/viz/particles after setting the pose. Spread means the filter is
+  still unsure; a tight cloud tracking the car means it has converged.
 -->
 <launch>
   <arg name="map" description="Map name (folder under stack_master/maps/)"/>
@@ -38,6 +42,11 @@
   <arg name="frenet" default="true"
        description="Also publish /car_state/frenet/*. Needs global_waypoints.json."/>
   <arg name="use_sim_time" default="false"/>
+  <arg name="rviz" default="true"
+       description="Needs a display. On a headless car use foxglove instead."/>
+  <arg name="foxglove" default="false"
+       description="Serve the topics over websocket so a laptop can connect"/>
+  <arg name="foxglove_port" default="8765"/>
 
   <let name="maps_dir"   value="$(find-pkg-share stack_master)/maps"/>
   <let name="map_dir"    value="$(var maps_dir)/$(var map)"/>
@@ -93,4 +102,14 @@
       <param name="use_sim_time" value="$(var use_sim_time)"/>
     </node>
   </group>
+
+  <!-- ===== viewing ===== -->
+  <node pkg="rviz2" exec="rviz2" name="rviz2" if="$(var rviz)"
+        args="-d $(find-pkg-share stack_master)/config/localization.rviz"/>
+
+  <node pkg="foxglove_bridge" exec="foxglove_bridge" name="foxglove_bridge"
+        output="screen" if="$(var foxglove)">
+    <param name="port" value="$(var foxglove_port)"/>
+    <param name="use_sim_time" value="$(var use_sim_time)"/>
+  </node>
 </launch>

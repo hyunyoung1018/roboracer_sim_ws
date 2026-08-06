@@ -126,7 +126,9 @@ ros2 service call /finish_mapping std_srvs/srv/Trigger {}
 
 # localisation on a saved map - everything above it needs this
 ros2 launch stack_master localization.launch.xml map:=<name>
-#   give it a starting guess with RViz "2D Pose Estimate"
+ros2 launch stack_master localization.launch.xml map:=<name> rviz:=false foxglove:=true
+#   drivers come up with it. Place the car with "2D Pose Estimate", then watch
+#   /pf/viz/particles: a tight cloud following the car means it has converged.
 
 # raceline from an existing map
 ros2 launch stack_master raceline_generator.launch.xml map:=<name>
