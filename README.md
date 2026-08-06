@@ -229,10 +229,13 @@ than measured.
 - [ ] **Measure the four VESC calibration gains** in `config/car/vesc.yaml`.
       They are still ForzaETH's; speed and steering angle will both be wrong.
       Procedure is in the file header.
-- [ ] **Verify the IMU yaw sign.** albomb's URDF has the VESC IMU at −90°.
-      Rotate the car counter-clockwise and check `angular_velocity.z` on
-      `/vesc/sensors/imu/raw` is positive. A wrong sign inverts cartographer's
-      rotation estimate and is very hard to diagnose afterwards.
+- [ ] **Settle the IMU Z axis.** The yaw is now +90°, verified on the car. But
+      the VESC board's Z reportedly points at the floor, and a Z flip is a roll
+      of pi, not a yaw - so the joint may still be wrong for gravity, which is
+      what cartographer uses the IMU for. Level and still, `linear_acceleration.z`
+      on `/vesc/sensors/imu/raw` should read about +9.8. If it reads −9.8, add
+      roll=pi in `albomb_sensors.xacro` and re-check the yaw sign, since the
+      flip changes it.
 - [ ] Pin the VESC serial port with a udev rule; `/dev/ttyACM0` moves on reboot.
 - [ ] Match the simulated LiDAR to the real one in `sim.yaml` if it drifts —
       1081 beams, 0.06–10 m, ±135°.

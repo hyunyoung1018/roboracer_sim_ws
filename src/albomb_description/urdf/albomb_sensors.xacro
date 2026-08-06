@@ -11,10 +11,23 @@
     </visual>
   </link>
 
+  <!-- VESC 6 MkVI onboard IMU.
+       Yaw is +90 deg, verified on the car: rotating it counter-clockwise gives
+       a positive angular_velocity.z on /vesc/sensors/imu/raw. It was -90 here
+       until then, which would have inverted every rotation the filters see.
+
+       OPEN: the board's Z axis reportedly points at the floor. If that is so,
+       yaw alone does not describe the mounting - a Z flip is a roll or pitch of
+       pi, not a rotation about the vertical - and this joint is still wrong for
+       gravity. It matters because cartographer uses the IMU to find "down", and
+       an inverted Z makes it find "up". Check with the car level and still:
+           ros2 topic echo /vesc/sensors/imu/raw --field linear_acceleration
+       z should read about +9.8. If it reads about -9.8, add rpy roll=pi here
+       and re-verify the yaw sign afterwards, since the flip changes it. -->
   <joint name="imu_joint" type="fixed">
     <parent link="${car_name}/base_link"/>
     <child link="${car_name}/imu"/>
-    <origin xyz="0.07 0.0 ${wheel_radius+0.04}" rpy="0 0 -1.5708"/>
+    <origin xyz="0.07 0.0 ${wheel_radius+0.04}" rpy="0 0 1.5708"/>
   </joint>
 
   <link name="${car_name}/laser">
