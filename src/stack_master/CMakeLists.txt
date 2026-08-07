@@ -13,8 +13,13 @@ find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 
 install(
-  DIRECTORY config launch maps scripts 
+  DIRECTORY config launch maps
   DESTINATION share/${PROJECT_NAME}
+)
+
+install(
+  PROGRAMS scripts/hokuyo_network_check.sh
+  DESTINATION lib/${PROJECT_NAME}
 )
 
 if(BUILD_TESTING)

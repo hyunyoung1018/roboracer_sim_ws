@@ -70,9 +70,16 @@
 
   <!-- ===== LiDAR ===== -->
   <group if="$(var lidar)">
-    <node pkg="urg_node" exec="urg_node_driver" name="urg_node" output="screen">
+    <!-- This wrapper performs a read-only preflight, then replaces itself with
+         urg_node only when the interface, address, and LiDAR are ready. The
+         watchdog reports runtime state. Neither process changes NetworkManager,
+         an interface, or any route. -->
+    <node pkg="stack_master" exec="hokuyo_network_check.sh" name="urg_node"
+          args="--urg-node" output="screen" respawn="true" respawn_delay="5.0">
       <param from="$(var config_dir)/sensors.yaml"/>
     </node>
+    <node pkg="stack_master" exec="hokuyo_network_check.sh"
+          name="hokuyo_network_watchdog" args="--watchdog" output="screen"/>
   </group>
 
   <!-- ===== VESC ===== -->
