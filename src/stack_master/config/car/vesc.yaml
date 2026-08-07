@@ -6,13 +6,34 @@
 #
 # TODO - measure on albomb before the first real run:
 #   speed_to_erpm_gain            drive a known distance, compare /vesc/odom
-#                                 travel against the tape measure
+#                                 travel against the tape measure   [DONE]
 #   steering_angle_to_servo_gain  \  centre the wheels to find the offset, then
 #   steering_angle_to_servo_offset/  drive a steady circle and solve
 #                                    tan(delta) = wheelbase / turn_radius
-#   servo_min / servo_max         raise until the steering hits its mechanical
-#                                 stop, then back off - a servo that stalls
-#                                 against the stop overheats
+#   servo_min / servo_max         see below
+#
+# FINDING servo_min / servo_max. The obvious approach does not work: the driver
+# clips every servo command to these same limits, so you cannot command past
+# them to discover where the real stop is. Open them first, on a driver started
+# by itself - the hard bounds in the code are 0.0 and 1.0:
+#
+#   ros2 run vesc_driver vesc_driver_node --ros-args -r __ns:=/vesc \
+#     --params-file src/stack_master/config/car/vesc.yaml \
+#     -p servo_min:=0.0 -p servo_max:=1.0
+#
+#   ros2 topic pub -1 /vesc/commands/servo/position std_msgs/msg/Float64 \
+#     "{data: 0.445}"      # centre, then step outward by 0.02
+#
+# Wheels off the ground, one step at a time, and stop the moment they stop
+# following. The last value that still moved them, backed off by one step, is
+# the limit. A servo held against its stop stalls and cooks itself, so never
+# command 0.0 or 1.0 directly - with the limits opened there is nothing left to
+# catch it.
+#
+# Convert what you find: delta = (offset - servo) / gain. The two sides should
+# come out close to equal. If they do not, the offset is wrong before the
+# limits are - it is meant to be the servo value at which the wheels point
+# dead ahead.
 #
 # Everything below sits under /** so all three vesc nodes share it.
 
