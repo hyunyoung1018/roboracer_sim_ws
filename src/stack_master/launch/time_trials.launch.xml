@@ -44,18 +44,20 @@
       LB (4)  human  - your stick drives the car
       RB (5)  auto   - the controller drives the car
 
-  Release both and the mux stops forwarding, which is what stops the car. It
-  also drops any source that goes stale, so a controller crash or a joystick
-  dropout both end in no command rather than the last one repeating.
+  Release both and the mux publishes zero from the next tick - it hands control
+  back rather than letting the last command stand. A source that goes stale is
+  dropped the same way, so a controller crash or a joystick dropout both end in
+  a commanded stop rather than the last speed repeating.
 
   joy_teleop is NOT started here. The mux reads /joy itself, and running both
   would put two things on the same output.
 
   Before the first autonomous run:
-    - App Settings / General in the VESC: Timeout and Timeout Brake Current.
-      Releasing both buttons stops the mux PUBLISHING, it does not send a stop,
-      so what actually brakes the car is the VESC noticing the commands ended.
-      With Timeout Brake Current at 0 the car just coasts.
+    - App Settings / General in the VESC: Timeout Brake Current is 0, so the
+      VESC coasts instead of braking when commands stop arriving. That is the
+      backup for the mux itself dying or the USB coming out, so it wants a real
+      current. Timeout is 1000 ms, which is 5 m of travel at the joystick
+      ceiling before anything happens.
     - Sector0.scaling starts at 0.5 and the ceiling is now 1.0. Raise it live
       once the line looks right, do not start there.
   Verified already: Motor Current Max Brake -60 A and Battery Current Max Regen

@@ -27,7 +27,12 @@ class SimpleMuxNode(Node):
         self.declare_parameter('rate_hz',                        50.0)
         self.declare_parameter('joy_max_speed',                  5.0)
         self.declare_parameter('joy_max_steer',                  0.4)
-        self.declare_parameter('joy_freshness_threshold',        1.0)
+        # [s] How long a command stays usable after its stamp. Both sources
+        # publish at 50 Hz, so this is ten missed messages - long enough to ride
+        # out a scheduling hiccup, short enough that a dead controller does not
+        # keep the car at its last speed. It is the fallback: a released deadman
+        # is handled immediately in _handle_joy, not by waiting for this.
+        self.declare_parameter('joy_freshness_threshold',        0.2)
         self.declare_parameter('servo_min',                      0.15)
         self.declare_parameter('servo_max',                      0.85)
         self.declare_parameter('steering_angle_to_servo_offset', 0.5)
@@ -104,6 +109,10 @@ class SimpleMuxNode(Node):
         zero = AckermannDriveStamped()
         zero.header.stamp = self.get_clock().now().to_msg()
 
+        # None only before anyone has engaged: stay silent so the mux is not a
+        # publisher on the drive topic until a human asks for it. 'idle' is
+        # different - control was engaged and then given back, and that has to
+        # be an active stop, so it falls through to the zero below.
         if self.current_host is None:
             return
         elif self.current_host == 'autodrive' and self._is_fresh(self.autodrive):            # out = self._clip(self.autodrive)
@@ -145,6 +154,16 @@ class SimpleMuxNode(Node):
             self.current_host  = 'humandrive'
         elif use_auto:
             self.current_host = 'autodrive'
+        else:
+            # Both deadmen released -> hand back to nobody, which _loop turns
+            # into a published zero on the very next tick.
+            #
+            # Without this branch current_host keeps whatever it was and the
+            # last command stays "fresh" for joy_freshness_threshold seconds,
+            # so releasing the stick at speed coasted on at that speed for the
+            # whole window before anything zeroed. Releasing the deadman has to
+            # stop the car now, not eventually.
+            self.current_host = 'idle'
 
 
 def main(args=None):
