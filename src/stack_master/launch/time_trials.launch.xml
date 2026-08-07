@@ -109,6 +109,11 @@
   <!-- ===== the racing brain ===== -->
   <node pkg="state_machine" exec="state_machine" name="state_machine" output="screen">
     <param from="$(var config_dir)/state_machine_params.yaml"/>
+    <!-- Where to read racecar_f110.ini, veh_dyn_info/ and the sector yamls.
+         Passed in because the node must not depend on stack_master: this
+         launch belongs to stack_master, and the dependency would be a cycle. -->
+    <param name="config_dir" value="$(var config_dir)"/>
+    <param name="map_dir" value="$(var map_dir)"/>
     <param name="timetrials_only" value="$(var timetrials_only)"/>
     <param name="sim" value="$(var use_sim_time)"/>
     <param name="map" value="$(var map)"/>

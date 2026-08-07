@@ -6,12 +6,6 @@ state_machine:
     timetrials_only: false
     sim: true
     measure: false
-    # Folder under stack_master/config/ holding racecar_f110.ini and
-    # veh_dyn_info/. UNIST calls this racecar_version and switches between one
-    # folder per car; we have one car, so it names the folder directly. Get it
-    # wrong and the node still starts - it warns once and falls back to generic
-    # vehicle params, which quietly degrades the velocity replanning.
-    car_config: "car"
     ot_planner: "lane_change"
     track_length: 1.0
     # geometry / horizons

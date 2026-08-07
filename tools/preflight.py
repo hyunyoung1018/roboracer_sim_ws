@@ -9,6 +9,8 @@ each of these has cost a round trip to the Jetson and back:
   * a package.xml that is well-formed XML and still illegal (catkin_pkg
     rejects a <depend> repeated as <exec_depend>, and kills the whole
     workspace's rosdep along with it)
+  * two workspace packages that depend on each other, which colcon refuses to
+    order at all - it does not build a subset, it builds nothing
   * a launch file using $(var x) that no <arg> or <let> declares
   * a yaml or xacro that stopped parsing
 
@@ -44,6 +46,30 @@ def check_package_xml():
                 fail(f, f"<{tag}>{dup}</{tag}> listed {names.count(dup)} times")
 
 
+def check_dependency_cycles():
+    """Depend edges between packages that live in this workspace.
+
+    An edge out to a system or pip package is fine and invisible here; only
+    workspace-to-workspace edges can form a cycle colcon has to resolve.
+    """
+    graph = {}
+    for f in sorted(glob.glob("src/**/package.xml", recursive=True)):
+        root = ET.parse(f).getroot()
+        name = root.findtext("name").strip()
+        deps = {
+            e.text.strip()
+            for tag in ("depend", "build_depend", "build_export_depend", "exec_depend")
+            for e in root.findall(tag)
+        }
+        graph[name] = (deps, f)
+    local = set(graph)
+    for name, (deps, f) in graph.items():
+        for dep in sorted(deps & local):
+            if name in graph[dep][0]:
+                if name < dep:  # report each pair once
+                    fail(f, f"{name} and {dep} depend on each other")
+
+
 def check_launch_vars():
     for f in sorted(glob.glob("src/**/launch/*.xml", recursive=True)):
         body = re.sub(r"<!--.*?-->", "", open(f).read(), flags=re.S)
@@ -67,6 +93,7 @@ def check_parses():
 
 def main():
     check_package_xml()
+    check_dependency_cycles()
     check_launch_vars()
     check_parses()
     if FAILURES:

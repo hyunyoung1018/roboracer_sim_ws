@@ -73,8 +73,15 @@ class StateMachineParams:
         self._declare("measure", False)
         self.measuring: bool = node.get_parameter("measure").value
 
-        self._declare("car_config", "car")
-        self.car_config: str = node.get_parameter("car_config").value
+        # Directories this node reads from, passed in rather than resolved
+        # against stack_master's share. Declaring that dependency made
+        # stack_master and state_machine depend on each other, which colcon
+        # cannot order; the launch already knows both paths.
+        self._declare("config_dir", "")
+        self.config_dir: str = node.get_parameter("config_dir").value
+
+        self._declare("map_dir", "")
+        self.map_dir: str = node.get_parameter("map_dir").value
 
         self._declare(
             "ot_planner", "lane_change",

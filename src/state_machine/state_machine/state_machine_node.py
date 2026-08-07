@@ -146,7 +146,11 @@ class StateMachine(Node):
         self.rate_hz = self.params.rate_hz
         self.n_loc_wpnts = self.params.n_loc_wpnts
         self.timetrials_only = self.params.timetrials_only
-        self.car_config = self.params.car_config
+        self.config_dir = self.params.config_dir
+        self.map_dir = self.params.map_dir
+        if not self.config_dir:
+            self.get_logger().warn(
+                "config_dir is unset: no vehicle params, velocity replanning degraded")
         self.ot_planner = self.params.ot_planner
         self.track_length = self.params.track_length
         self.volt_threshold = self.params.volt_threshold
@@ -448,10 +452,9 @@ class StateMachine(Node):
     def _load_sector_yamls(self):
         # read the map sector yamls into sectors_params / ot_sectors_params (ROS1 /map_params, /ot_map_params)
         import yaml
-        try:
-            maps_dir = os.path.join(get_package_share_directory("stack_master"), "maps", self.map_name)
-        except Exception:
-            self.get_logger().warn(f"[{self.name}] could not locate stack_master maps dir; no sectors loaded")
+        maps_dir = self.map_dir
+        if not maps_dir:
+            self.get_logger().warn(f"[{self.name}] map_dir is unset; no sectors loaded")
             return
         sp = os.path.join(maps_dir, "speed_scaling.yaml")
         if os.path.exists(sp):
@@ -534,18 +537,10 @@ class StateMachine(Node):
     def _load_vehicle_dynamics(self):
         """Load veh params + ggv / ax_max machine info from stack_master config."""
         self.pars = {}
-        try:
-            stack_master_path = get_package_share_directory("stack_master")
-        except Exception:
-            stack_master_path = None
-
         parser = configparser.ConfigParser()
         ini_ok = False
-        if stack_master_path is not None:
-            ini_path = os.path.join(
-                stack_master_path, "config", self.params.car_config, "racecar_f110.ini"
-            )
-            ini_ok = bool(parser.read(ini_path))
+        if self.config_dir:
+            ini_ok = bool(parser.read(os.path.join(self.config_dir, "racecar_f110.ini")))
 
         if not ini_ok:
             # Sim / missing config fallback: provide sane defaults so the node still runs.
@@ -564,7 +559,7 @@ class StateMachine(Node):
 
         self.pars["veh_params"] = json.loads(parser.get("GENERAL_OPTIONS", "veh_params"))
         self.pars["vel_calc_opts"] = json.loads(parser.get("GENERAL_OPTIONS", "vel_calc_opts"))
-        vdyn = os.path.join(stack_master_path, "config", self.params.car_config, "veh_dyn_info")
+        vdyn = os.path.join(self.config_dir, "veh_dyn_info")
         ggv_path = os.path.join(vdyn, "ggv.csv")
         ax_max_path = os.path.join(vdyn, "ax_max_machines.csv")
         b_ax_max_path = os.path.join(vdyn, "b_ax_max_machines.csv")
@@ -1531,12 +1526,10 @@ class StateMachine(Node):
         # ROS1 dynamic_statemachine_server.save_yaml: persist the dynamic tunables to
         # state_machine_params.yaml, preserving the other keys.
         import yaml
-        try:
-            path = os.path.join(get_package_share_directory("stack_master"),
-                                "config", "state_machine_params.yaml")
-        except Exception:
-            self.get_logger().error(f"[{self.name}] cannot locate state_machine_params.yaml")
+        if not self.config_dir:
+            self.get_logger().error(f"[{self.name}] config_dir unset; cannot save params")
             return
+        path = os.path.join(self.config_dir, "state_machine_params.yaml")
         keys = ["lateral_width_gb_m", "lateral_width_ot_m", "overtaking_ttl_sec",
                 "splini_hyst_timer_sec", "splini_ttl", "pred_splini_ttl",
                 "emergency_break_horizon", "ftg_speed_mps", "ftg_timer_sec",
