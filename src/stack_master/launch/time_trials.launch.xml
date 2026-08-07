@@ -52,10 +52,14 @@
   would put two things on the same output.
 
   Before the first autonomous run:
-    - the VESC calibration gains are still ForzaETH's (config/car/vesc.yaml)
-    - Allow Braking must be True in the VESC, or commanded decelerations do
-      nothing and the car will overshoot every corner
-    - start with speed_scaling well below 1.0 in the map's speed_scaling.yaml
+    - App Settings / General in the VESC: Timeout and Timeout Brake Current.
+      Releasing both buttons stops the mux PUBLISHING, it does not send a stop,
+      so what actually brakes the car is the VESC noticing the commands ended.
+      With Timeout Brake Current at 0 the car just coasts.
+    - Sector0.scaling starts at 0.5 and the ceiling is now 1.0. Raise it live
+      once the line looks right, do not start there.
+  Verified already: Motor Current Max Brake -60 A and Battery Current Max Regen
+  -60 A, so commanded decelerations do reach the motor.
 -->
 <launch>
   <arg name="map" description="Map name (folder under stack_master/maps/)"/>
