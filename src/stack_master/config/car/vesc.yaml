@@ -60,6 +60,20 @@
     speed_max: 35400.0
     position_min: 0.0
     position_max: 0.0
+    # UNCALIBRATED, and measurably wrong. With the gain and offset above these
+    # reach +0.268 rad one way and -0.368 rad the other, and a steering rack
+    # that is symmetric in hardware cannot be asymmetric in range - so it is
+    # these limits that are off, not the commands hitting them. Full stick
+    # (delta_max 0.34 in racecar_f110.ini) asks for servo 0.071 and gets
+    # clipped, which is the last fifth of stick travel doing nothing.
+    #
+    # If delta_max 0.34 is right, the matching pair is 0.071 / 0.819. Do not
+    # just paste those in: find them by moving the servo in small steps until
+    # the steering reaches its mechanical stop, then back off. A servo held
+    # against its stop stalls and cooks itself.
+    #
+    # This also bounds the raceline. The optimiser plans corners assuming
+    # delta_max 0.34; at 0.268 the car cannot follow its own tightest ones.
     servo_min: 0.15
     servo_max: 0.85
 

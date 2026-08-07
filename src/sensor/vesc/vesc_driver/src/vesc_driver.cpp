@@ -467,15 +467,20 @@ double VescDriver::CommandLimit::clip(double value)
 {
   auto clock = rclcpp::Clock(RCL_ROS_TIME);
 
+  // The throttle argument is MILLISECONDS. Upstream passes 10, which throttles
+  // to 100 Hz - no throttle at all for something driven by a servo command
+  // stream, and enough console traffic over ssh to stall the callback thread
+  // and make the car feel laggy. 10 s is what the number was clearly meant to
+  // be: still loud enough to notice, quiet enough to ignore.
   if (lower && value < lower) {
     RCLCPP_INFO_THROTTLE(
-      logger, clock, 10, "%s command value (%f) below minimum limit (%f), clipping.",
+      logger, clock, 10000, "%s command value (%f) below minimum limit (%f), clipping.",
       name.c_str(), value, *lower);
     return *lower;
   }
   if (upper && value > upper) {
     RCLCPP_INFO_THROTTLE(
-      logger, clock, 10, "%s command value (%f) above maximum limit (%f), clipping.",
+      logger, clock, 10000, "%s command value (%f) above maximum limit (%f), clipping.",
       name.c_str(), value, *upper);
     return *upper;
   }
