@@ -11,22 +11,29 @@
     </visual>
   </link>
 
-  <!-- VESC 6 MkVI onboard IMU. Yaw +90 deg, verified on the car by rotating it
-       counter-clockwise and watching angular_velocity.z go positive.
+  <!-- VESC 6 MkVI onboard IMU: yaw +90 deg and Z facing the floor, both
+       established on the car.
 
-       Z is up, not down: VESC Tool's IMU calibration levelled the board with
-       roll 7.4 deg and pitch -4.7 deg, which is mounting tilt. A board facing
-       the floor would have needed roll near 180. Its Imu Rotation Yaw is 0, so
-       the +90 here is the only place the yaw is applied - do not also set it
-       in the firmware or it lands twice.
+       Roll pi is the Z flip, not a tilt. Together the two give
+
+           forward = +imu.y    left = +imu.x    up = -imu.z
+
+       so level and still, imu.z reads about -9.8, and the yaw rate is
+       -angular_velocity.z. That last one is what UNIST hardcoded for their own
+       car, which is a second, independent sign that this is the right way up.
+
+       VESC Tool's own Imu Rotation is roll 7.4 / pitch -4.7 / yaw 0 - mounting
+       tilt only. Do not put the 90 or the 180 in there as well; this joint is
+       where they belong, and the firmware would apply them twice.
 
        This joint is the single description of the mounting. controller_manager
-       reads it back through TF to rotate the IMU into the car's axes, so
-       getting it wrong here silently rotates the controller's yaw rate too. -->
+       reads it back through TF to rotate the IMU into the car's axes, and
+       cartographer tracks in this frame, so an error here rotates the
+       controller's yaw rate and tilts the map with no other symptom. -->
   <joint name="imu_joint" type="fixed">
     <parent link="${car_name}/base_link"/>
     <child link="${car_name}/imu"/>
-    <origin xyz="0.07 0.0 ${wheel_radius+0.04}" rpy="0 0 1.5708"/>
+    <origin xyz="0.07 0.0 ${wheel_radius+0.04}" rpy="3.141592 0 1.5708"/>
   </joint>
 
   <link name="${car_name}/laser">
