@@ -47,9 +47,10 @@
   <exec_depend>frenet_odom_republisher</exec_depend>
 
   <!-- time_trials.launch.xml -->
+  <!-- ackermann_msgs is NOT repeated here: the <depend> above already implies
+       exec, and catkin_pkg rejects the package outright for the redundancy. -->
   <exec_depend>controller</exec_depend>
   <exec_depend>state_machine</exec_depend>
-  <exec_depend>ackermann_msgs</exec_depend>
 
   <!-- base_system.launch.xml -->
   <exec_depend>raceline</exec_depend>
