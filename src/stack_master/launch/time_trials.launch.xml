@@ -63,8 +63,9 @@
        description="Bring up localisation too. false if it is already running."/>
   <arg name="timetrials_only" default="true"
        description="Ignore obstacles. false needs perception and the planners."/>
-  <arg name="joy_max_speed" default="2.0"
-       description="[m/s] ceiling on the manual override, not on the controller"/>
+  <arg name="joy_max_speed" default="5.0"
+       description="[m/s] full stick on the manual override. The controller is
+                    capped separately, by global_limit in speed_scaling.yaml."/>
   <arg name="use_sim_time" default="false"/>
   <arg name="rviz" default="true"/>
   <arg name="foxglove" default="false"/>

@@ -30,6 +30,11 @@ class SectorSlicer(Node):
         self.global_wpnts = None
         self.track_bounds = None
 
+        # Written into a new map's speed_scaling.yaml. The ceiling is 1.0 (the
+        # raceline's own optimised profile) and the live setpoint starts at half
+        # of it, so a freshly sliced map is slow until someone raises it rather
+        # than unable to go fast without an edit and a rebuild.
+        self.speed_limit = 1.0
         self.speed_scaling = 0.5
         self.glob_slider_s = 0
         self.sector_pnts = [0] #Sector always has tostart at 0
@@ -158,7 +163,7 @@ class SectorSlicer(Node):
     def sectors_to_yaml(self):
         #Create yaml with default speed scaling values
         n_sectors = len(self.sector_pnts) - 1
-        dict_file = {'global_limit': self.speed_scaling, 'n_sectors': n_sectors}
+        dict_file = {'global_limit': self.speed_limit, 'n_sectors': n_sectors}
         for i in range(0, n_sectors):
             #Add sectors with scaling field
             dict_file['Sector' + str(i)] = {'start':self.sector_pnts[i] if i == 0 else self.sector_pnts[i] + 1,

@@ -44,10 +44,12 @@ joy_teleop:
       axis_mappings:
         drive-speed:
           axis: 1
-          # [m/s] at full stick. Start low for mapping - cartographer wants a
-          # slow, steady drive, and the sensorless VESC is unreliable at
-          # crawling speed anyway.
-          scale: 2.0
+          # [m/s] at full stick, proportional below that. Well under the VESC's
+          # own limit: at speed_to_erpm_gain 4425 this asks for 22k ERPM against
+          # a speed_max of 69k. Drive mapping laps on part throttle - cartographer
+          # wants a slow steady pass - and keep the rest for getting back to the
+          # start line.
+          scale: 5.0
           offset: 0.0
         drive-steering_angle:
           axis: 3
