@@ -14,12 +14,15 @@
   <!-- VESC 6 MkVI onboard IMU. Yaw +90 deg, verified on the car by rotating it
        counter-clockwise and watching angular_velocity.z go positive.
 
-       OPEN, and it matters for mapping: the board's Z reportedly faces the
-       floor. A Z flip is a roll of pi, not a yaw, so this joint may still be
-       wrong about which way is down, which is exactly what cartographer uses
-       the IMU for. Level and still, linear_acceleration.z should be about
-       +9.8; if it is about -9.8, add roll=pi below and re-check the yaw sign,
-       because the flip changes it. -->
+       Z is up, not down: VESC Tool's IMU calibration levelled the board with
+       roll 7.4 deg and pitch -4.7 deg, which is mounting tilt. A board facing
+       the floor would have needed roll near 180. Its Imu Rotation Yaw is 0, so
+       the +90 here is the only place the yaw is applied - do not also set it
+       in the firmware or it lands twice.
+
+       This joint is the single description of the mounting. controller_manager
+       reads it back through TF to rotate the IMU into the car's axes, so
+       getting it wrong here silently rotates the controller's yaw rate too. -->
   <joint name="imu_joint" type="fixed">
     <parent link="${car_name}/base_link"/>
     <child link="${car_name}/imu"/>

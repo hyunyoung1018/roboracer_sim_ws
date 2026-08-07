@@ -17,7 +17,8 @@ from geometry_msgs.msg import Point
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import Imu
 from std_msgs.msg import Float32, Bool
-from tf_transformations import euler_from_quaternion, quaternion_from_euler
+from tf_transformations import euler_from_quaternion, quaternion_from_euler, quaternion_matrix
+import tf2_ros
 from visualization_msgs.msg import Marker, MarkerArray
 
 from controller.combined.src.Controller import Controller
@@ -142,6 +143,13 @@ class ControllerManager(Node):
         # Subscribers
         self.create_subscription(BehaviorStrategy, '/behavior_strategy', self.behavior_cb, 10)
         self.create_subscription(Odometry, '/car_state/odom', self.odom_cb, 10)
+        # The IMU arrives in its own frame and has to be rotated into the car's
+        # before any component of it means what its name says. That rotation is
+        # already stated once, in the URDF, so it is read from TF rather than
+        # written down a second time here - see _imu_to_base().
+        self.tf_buffer = tf2_ros.Buffer()
+        self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
+        self._imu_rot = None
         self.create_subscription(Imu, '/imu/data', self.imu_cb, 10)
         self.create_subscription(Odometry, '/car_state/odom_frenet', self.car_state_frenet_cb, 10)
         self.create_subscription(LaserScan, '/scan', self.scan_cb, qos_profile_sensor_data)
@@ -336,11 +344,47 @@ class ControllerManager(Node):
         self.waypoint_safety_counter = 0
         self.state = data.state
 
-    def imu_cb(self, data):
-        self.acc_now[1:] = self.acc_now[:-1]
-        self.acc_now[0] = -data.linear_acceleration.x  # vesc is rotated 90 deg, so (-acc_y) == (long_acc)
+    def _imu_to_base(self, imu_frame):
+        """Rotation from the IMU frame into base_frame, cached.
 
-        self.yaw_rate = -data.angular_velocity.z  # vesc is rotated 90 deg, so (-acc_y) == (long_acc)
+        The transform is fixed (URDF), so this resolves once and is reused.
+        Only the rotation is taken: the lever arm would add a centripetal term
+        to the acceleration, which at this car's yaw rates and 7 cm offset is
+        far below the noise the ten-sample mean below is already smoothing out.
+        """
+        if self._imu_rot is None:
+            try:
+                tf = self.tf_buffer.lookup_transform(
+                    self.base_frame, imu_frame, rclpy.time.Time())
+            except Exception:
+                return None
+            q = tf.transform.rotation
+            self._imu_rot = quaternion_matrix([q.x, q.y, q.z, q.w])[:3, :3]
+            self.get_logger().info(
+                f"IMU {imu_frame} -> {self.base_frame} rotation resolved from TF")
+        return self._imu_rot
+
+    def imu_cb(self, data):
+        # UNIST hardcoded the axis swap for their mounting (-acc.x as
+        # longitudinal, -gyro.z as yaw rate). albomb's IMU sits at a different
+        # angle, so those pick the lateral axis and the wrong sense of rotation
+        # - and a flipped yaw rate makes the controller predict the car turning
+        # the other way. Deriving it from TF means the URDF stays the one place
+        # the mounting is described.
+        rot = self._imu_to_base(data.header.frame_id)
+        if rot is None:
+            return  # TF not up yet; better no sample than one on the wrong axis
+
+        acc = rot @ np.array([data.linear_acceleration.x,
+                              data.linear_acceleration.y,
+                              data.linear_acceleration.z])
+        gyr = rot @ np.array([data.angular_velocity.x,
+                              data.angular_velocity.y,
+                              data.angular_velocity.z])
+
+        self.acc_now[1:] = self.acc_now[:-1]
+        self.acc_now[0] = acc[0]   # longitudinal, +forward
+        self.yaw_rate = gyr[2]     # +counter-clockwise
         if self.controller is not None:
             self.controller.yaw_rate = self.yaw_rate
 
