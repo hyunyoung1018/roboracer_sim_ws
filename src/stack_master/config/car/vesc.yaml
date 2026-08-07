@@ -47,8 +47,17 @@
     current_max: 100.0
     brake_min: -20000.0
     brake_max: 200000.0
-    speed_min: -69000.0
-    speed_max: 69000.0
+    # Sanity clamp on the ERPM command, in the only unit that means anything
+    # here: 35400 = 8 m/s at the calibrated speed_to_erpm_gain above. Re-derive
+    # it (4425 * v_max) if that gain is ever recalibrated, or this silently
+    # becomes a different speed.
+    #
+    # Was 69000, copied from race_stack's NUC configs - 15.6 m/s at our gain,
+    # a speed this car cannot reach, so the clamp never fired. ForzaETH's own
+    # Jetson config and UNIST both use 23250. This is not what protects the
+    # motor; that is Max ERPM and the current limits in the VESC firmware.
+    speed_min: -35400.0
+    speed_max: 35400.0
     position_min: 0.0
     position_max: 0.0
     servo_min: 0.15
