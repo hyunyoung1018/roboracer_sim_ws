@@ -10,7 +10,7 @@
 #   steering_angle_to_servo_gain  \  centre the wheels to find the offset, then
 #   steering_angle_to_servo_offset/  drive a steady circle and solve
 #                                    tan(delta) = wheelbase / turn_radius
-#   servo_min / servo_max         see below
+#   servo_min / servo_max         [DONE] 0.12 / 0.77, see below
 #
 # FINDING servo_min / servo_max. The obvious approach does not work: the driver
 # clips every servo command to these same limits, so you cannot command past
@@ -81,22 +81,17 @@
     speed_max: 35400.0
     position_min: 0.0
     position_max: 0.0
-    # UNCALIBRATED, and measurably wrong. With the gain and offset above these
-    # reach +0.268 rad one way and -0.368 rad the other, and a steering rack
-    # that is symmetric in hardware cannot be asymmetric in range - so it is
-    # these limits that are off, not the commands hitting them. Full stick
-    # (delta_max 0.34 in racecar_f110.ini) asks for servo 0.071 and gets
-    # clipped, which is the last fifth of stick travel doing nothing.
+    # MEASURED on albomb. Mechanical stops are at 0.10 and 0.90, and the
+    # wheels point dead ahead at 0.445 - so the rack is not centred in its own
+    # travel: 0.345 one way against 0.455 the other. Steering has to be
+    # symmetric, so both sides take the smaller number, and both back off 0.02
+    # from the stop. A corner holds the limit for as long as the corner lasts,
+    # and a servo held against its stop is a servo stalling.
     #
-    # If delta_max 0.34 is right, the matching pair is 0.071 / 0.819. Do not
-    # just paste those in: find them by moving the servo in small steps until
-    # the steering reaches its mechanical stop, then back off. A servo held
-    # against its stop stalls and cooks itself.
-    #
-    # This also bounds the raceline. The optimiser plans corners assuming
-    # delta_max 0.34; at 0.268 the car cannot follow its own tightest ones.
-    servo_min: 0.15
-    servo_max: 0.85
+    # These give delta_max 0.2955 rad (16.9 deg). racecar_f110.ini's curvlim
+    # is derived from it: tan(delta_max) / wheelbase.
+    servo_min: 0.12
+    servo_max: 0.77
 
 /**/vesc_to_odom_node:
   ros__parameters:
