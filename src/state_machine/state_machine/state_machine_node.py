@@ -570,9 +570,21 @@ class StateMachine(Node):
         self.ggv, self.ax_max_machines = tph.import_veh_dyn_info.import_veh_dyn_info(
             ggv_import_path=ggv_path, ax_max_machines_import_path=ax_max_path
         )
-        _, self.b_ax_max_machines = tph.import_veh_dyn_info.import_veh_dyn_info(
-            ggv_import_path=ggv_path, ax_max_machines_import_path=b_ax_max_path
-        )
+        # Braking limits are optional. Without this guard a missing csv raises
+        # FileNotFoundError out of the constructor, and this node dying takes
+        # the whole drive chain with it: no /behavior_strategy means the
+        # controller never publishes and the car cannot be driven at all. Fall
+        # back to the acceleration table, which is the conservative direction -
+        # this car brakes at least as hard as it accelerates.
+        try:
+            _, self.b_ax_max_machines = tph.import_veh_dyn_info.import_veh_dyn_info(
+                ggv_import_path=ggv_path, ax_max_machines_import_path=b_ax_max_path
+            )
+        except Exception as exc:
+            self.get_logger().warn(
+                f"{b_ax_max_path} unreadable ({exc}); using the acceleration "
+                "limits for braking too")
+            self.b_ax_max_machines = self.ax_max_machines
 
     def now_sec(self) -> float:
         return time_to_float(self.get_clock().now().to_msg())
