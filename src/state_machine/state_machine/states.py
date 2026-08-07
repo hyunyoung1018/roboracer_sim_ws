@@ -13,7 +13,7 @@ Every function should be fairly concise, and output an array of f110_msgs.Wpnt
 """
 
 
-def GlobalTracking(state_machine: "StateMachine") -> List[Wpnt]:
+def RacelineTracking(state_machine: "StateMachine") -> List[Wpnt]:
     s = int(state_machine.cur_s / state_machine.waypoints_dist + 0.5)
     return [state_machine.cur_gb_wpnts.list[(s + i) % state_machine.num_glb_wpnts]
             for i in range(state_machine.n_loc_wpnts)]

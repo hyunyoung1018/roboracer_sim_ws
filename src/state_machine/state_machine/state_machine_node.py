@@ -146,7 +146,7 @@ class StateMachine(Node):
         self.rate_hz = self.params.rate_hz
         self.n_loc_wpnts = self.params.n_loc_wpnts
         self.timetrials_only = self.params.timetrials_only
-        self.racecar_version = self.params.racecar_version
+        self.car_config = self.params.car_config
         self.ot_planner = self.params.ot_planner
         self.track_length = self.params.track_length
         self.volt_threshold = self.params.volt_threshold
@@ -285,7 +285,7 @@ class StateMachine(Node):
         self.ftg_disabled = not self.params.ftg_active
 
         # Force GBTRACK state
-        self.force_gbtrack_state = self.params.force_GBTRACK
+        self.force_raceline_state = self.params.force_RACELINE
 
         self.overtaking_ttl_sec = self.params.overtaking_ttl_sec
         self.overtaking_ttl_count = 0
@@ -307,20 +307,20 @@ class StateMachine(Node):
         self.y_viz = 0
 
         # STATES
-        self.cur_state = StateType.GB_TRACK
-        self.local_wpnts_src = StateType.GB_TRACK
+        self.cur_state = StateType.RACELINE
+        self.local_wpnts_src = StateType.RACELINE
         self.static_avoid = False
         self.fail_trailing = False
 
         self.states = {
-            StateType.GB_TRACK: states.GlobalTracking,
+            StateType.RACELINE: states.RacelineTracking,
             StateType.OVERTAKE: states.Overtaking,
             StateType.FTGONLY: states.FTGOnly,
             StateType.RECOVERY: states.RECOVERY,
             StateType.START: states.START,
         }
         self.state_transitions = {
-            StateType.GB_TRACK: state_transitions.GlobalTrackingTransition,
+            StateType.RACELINE: state_transitions.RacelineTrackingTransition,
             StateType.RECOVERY: state_transitions.RecoveryTransition,
             StateType.TRAILING: state_transitions.TrailingTransition,
             StateType.ATTACK: state_transitions.TrailingTransition,
@@ -477,7 +477,7 @@ class StateMachine(Node):
             sec = self.sectors_params.get(f"Sector{i}", {}) or {}
             if sec.get("only_FTG", False):
                 # end+1 == next sector's start: close the 1-index gap so adjacent FTG
-                # sectors don't briefly drop to GB_TRACK (ROS1 used [start, end]).
+                # sectors don't briefly drop to RACELINE (ROS1 used [start, end]).
                 self.only_ftg_zones.append([sec.get("start", 0), sec.get("end", 0) + 1])
 
         self.overtake_zones = []
@@ -543,7 +543,7 @@ class StateMachine(Node):
         ini_ok = False
         if stack_master_path is not None:
             ini_path = os.path.join(
-                stack_master_path, "config", self.params.racecar_version, "racecar_f110.ini"
+                stack_master_path, "config", self.params.car_config, "racecar_f110.ini"
             )
             ini_ok = bool(parser.read(ini_path))
 
@@ -564,7 +564,7 @@ class StateMachine(Node):
 
         self.pars["veh_params"] = json.loads(parser.get("GENERAL_OPTIONS", "veh_params"))
         self.pars["vel_calc_opts"] = json.loads(parser.get("GENERAL_OPTIONS", "vel_calc_opts"))
-        vdyn = os.path.join(stack_master_path, "config", self.params.racecar_version, "veh_dyn_info")
+        vdyn = os.path.join(stack_master_path, "config", self.params.car_config, "veh_dyn_info")
         ggv_path = os.path.join(vdyn, "ggv.csv")
         ax_max_path = os.path.join(vdyn, "ax_max_machines.csv")
         b_ax_max_path = os.path.join(vdyn, "b_ax_max_machines.csv")
@@ -1005,7 +1005,7 @@ class StateMachine(Node):
 
     def _src_cache(self, src):
         # The planner-output cache a given local_wpnts_src slices from (None if the
-        # source is not backed by an OT/recovery cache, e.g. GB_TRACK).
+        # source is not backed by an OT/recovery cache, e.g. RACELINE).
         if src == StateType.OVERTAKE:
             return self.cur_static_avoidance_wpnts if self.static_overtaking_mode else self.cur_avoidance_wpnts
         if src == StateType.RECOVERY:
@@ -1210,7 +1210,7 @@ class StateMachine(Node):
 
         # Never slice an invalidated cache: once _expire_stale_cache drops a path
         # (planner stopped emitting), is_init is False and its array is a frozen
-        # old trajectory. Returning [] here makes the caller fall back to GB_TRACK
+        # old trajectory. Returning [] here makes the caller fall back to RACELINE
         # instead of emitting a stale/behind-the-car local path.
         if not wpnts.is_init:
             self._splini_dbg = {"static": bool(self.static_overtaking_mode), "invalid_cache": True}
@@ -1428,7 +1428,7 @@ class StateMachine(Node):
         mrk.scale.y = 1.0
         mrk.scale.z = 1.0
 
-        if state == "GB_TRACK":
+        if state == "RACELINE":
             mrk.color.b = 1.0
         elif state == "OVERTAKE":
             mrk.color.r = 1.0
@@ -1493,7 +1493,7 @@ class StateMachine(Node):
             return []
 
     def get_traling_target(self):
-        if self.local_wpnts_src == StateType.GB_TRACK and self.cur_gb_wpnts.closest_target is not None:
+        if self.local_wpnts_src == StateType.RACELINE and self.cur_gb_wpnts.closest_target is not None:
             return [self.cur_gb_wpnts.closest_target]
         elif self.local_wpnts_src == StateType.RECOVERY and self.cur_recovery_wpnts.closest_target is not None:
             return [self.cur_recovery_wpnts.closest_target]
@@ -1509,7 +1509,7 @@ class StateMachine(Node):
         # un-committed OT line -- exactly what the OT-blended recovery path exists to
         # avoid. Keep the src the transition chose (GB/RECOVERY); only pick the trailing
         # target (the farthest-ahead obstacle) off that same source.
-        if local_wpnts_src == StateType.GB_TRACK and self.cur_gb_wpnts.closest_target is not None:
+        if local_wpnts_src == StateType.RACELINE and self.cur_gb_wpnts.closest_target is not None:
             return [self.cur_gb_wpnts.closest_target], local_wpnts_src
 
         if local_wpnts_src == StateType.RECOVERY and self.cur_recovery_wpnts.closest_target is not None:
@@ -1519,7 +1519,7 @@ class StateMachine(Node):
 
     def check_ot_cloest_target(self):
         if self.gb_closest_target is not None and self.ot_closest_target is not None and \
-                self.local_wpnts_src == StateType.GB_TRACK:
+                self.local_wpnts_src == StateType.RACELINE:
             if self.ot_closest_gap > self.gb_closest_gap:
                 self.local_wpnts_src = StateType.OVERTAKE
         elif self.cur_recovery_wpnts.closest_target is not None and self.ot_closest_target is not None and \
@@ -1540,7 +1540,7 @@ class StateMachine(Node):
         keys = ["lateral_width_gb_m", "lateral_width_ot_m", "overtaking_ttl_sec",
                 "splini_hyst_timer_sec", "splini_ttl", "pred_splini_ttl",
                 "emergency_break_horizon", "ftg_speed_mps", "ftg_timer_sec",
-                "ftg_active", "force_GBTRACK"]
+                "ftg_active", "force_RACELINE"]
         try:
             with open(path, "r") as f:
                 data = yaml.safe_load(f) or {}
@@ -1602,9 +1602,9 @@ class StateMachine(Node):
             )
             self.publish_not_ready_marker()
 
-        if self.force_gbtrack_state:
-            self.cur_state = StateType.GB_TRACK
-            self.local_wpnts_src = StateType.GB_TRACK
+        if self.force_raceline_state:
+            self.cur_state = StateType.RACELINE
+            self.local_wpnts_src = StateType.RACELINE
         elif self._check_only_ftg_zone():
             self.cur_state = StateType.FTGONLY
             self.local_wpnts_src = StateType.FTGONLY
@@ -1658,13 +1658,13 @@ class StateMachine(Node):
         # is left as the transition decided (e.g. TRAILING keeps trailing/braking), so
         # this never turns "obstacle ahead" into a full-speed GB run.
         if not local_wpnts:
-            self.local_wpnts_src = StateType.GB_TRACK
-            local_wpnts = self.states[StateType.GB_TRACK](self)
+            self.local_wpnts_src = StateType.RACELINE
+            local_wpnts = self.states[StateType.RACELINE](self)
 
         self._publish_debug(local_wpnts)
 
         if self.cur_state == StateType.LOSTLINE:
-            self.cur_state = StateType.GB_TRACK
+            self.cur_state = StateType.RACELINE
 
         need_vel_planner = False
         self.behavior_strategy.header.stamp = self.get_clock().now().to_msg()

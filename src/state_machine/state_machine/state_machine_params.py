@@ -73,8 +73,8 @@ class StateMachineParams:
         self._declare("measure", False)
         self.measuring: bool = node.get_parameter("measure").value
 
-        self._declare("racecar_version", "NUCX")
-        self.racecar_version: str = node.get_parameter("racecar_version").value
+        self._declare("car_config", "car")
+        self.car_config: str = node.get_parameter("car_config").value
 
         self._declare(
             "ot_planner", "lane_change",
@@ -231,8 +231,8 @@ class StateMachineParams:
         self._declare("ftg_active", False)
         self.ftg_active: bool = node.get_parameter("ftg_active").value
 
-        self._declare("force_GBTRACK", False)
-        self.force_GBTRACK: bool = node.get_parameter("force_GBTRACK").value
+        self._declare("force_RACELINE", False)
+        self.force_RACELINE: bool = node.get_parameter("force_RACELINE").value
 
         self._declare("use_force_trailing", False)
         self.use_force_trailing: bool = node.get_parameter("use_force_trailing").value
@@ -300,8 +300,8 @@ class StateMachineParams:
             # ROS1 dyn_param_cb live-update behaviour). Keep them in sync.
             if name in self._NODE_MIRRORED_PARAMS and hasattr(self.node, name):
                 setattr(self.node, name, value)
-            if name == "force_GBTRACK":
-                self.node.force_gbtrack_state = value
+            if name == "force_RACELINE":
+                self.node.force_raceline_state = value
             if name == "use_force_trailing":
                 self.node.use_force_trailing = value
 

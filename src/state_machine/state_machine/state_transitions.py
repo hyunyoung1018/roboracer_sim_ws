@@ -29,8 +29,8 @@ NOTE 3: transitions must not have side effects on the state machine!
 """
 
 
-def GlobalTrackingTransition(state_machine: "StateMachine", close_to_raceline=None) -> Tuple[StateType, StateType]:
-    """Transitions for being in `StateType.GB_TRACK`"""
+def RacelineTrackingTransition(state_machine: "StateMachine", close_to_raceline=None) -> Tuple[StateType, StateType]:
+    """Transitions for being in `StateType.RACELINE`"""
     if close_to_raceline is None:
         close_to_raceline = state_machine._check_close_to_raceline()
 
@@ -50,7 +50,7 @@ def RecoveryTransition(state_machine: "StateMachine") -> Tuple[StateType, StateT
     if recovery_sustainability and not close_to_raceline:
         return StateType.RECOVERY, StateType.RECOVERY
 
-    return GlobalTrackingTransition(state_machine, close_to_raceline)
+    return RacelineTrackingTransition(state_machine, close_to_raceline)
 
 
 def TrailingTransition(state_machine: "StateMachine") -> Tuple[StateType, StateType]:
@@ -76,7 +76,7 @@ def OvertakingTransition(state_machine: "StateMachine") -> Tuple[StateType, Stat
         return StateType.OVERTAKE, StateType.OVERTAKE
     state_machine.overtaking_ttl_count = 0
     close_to_raceline = state_machine._check_close_to_raceline(0.05) * state_machine._check_close_to_raceline_heading(20)
-    return GlobalTrackingTransition(state_machine, close_to_raceline)
+    return RacelineTrackingTransition(state_machine, close_to_raceline)
 
 
 def StartTransition(state_machine: "StateMachine") -> Tuple[StateType, StateType]:
@@ -91,7 +91,7 @@ def StartTransition(state_machine: "StateMachine") -> Tuple[StateType, StateType
             state_machine._check_close_to_raceline(0.05) * state_machine._check_close_to_raceline_heading(20)
         )
         state_machine.cur_start_wpnts.is_init = False
-        return GlobalTrackingTransition(state_machine, close_to_raceline)
+        return RacelineTrackingTransition(state_machine, close_to_raceline)
 
 
 def FTGOnlyTransition(state_machine: "StateMachine") -> Tuple[StateType, StateType]:
@@ -101,7 +101,7 @@ def FTGOnlyTransition(state_machine: "StateMachine") -> Tuple[StateType, StateTy
         return NonObstacleTransition(state_machine, close_to_raceline)
     else:
         if close_to_raceline and state_machine._check_free_frenet(state_machine.cur_gb_wpnts):
-            return StateType.GB_TRACK, StateType.GB_TRACK
+            return StateType.RACELINE, StateType.RACELINE
 
         recovery_availability = state_machine._check_latest_wpnts(
             state_machine.recovery_wpnts, state_machine.cur_recovery_wpnts
@@ -121,19 +121,19 @@ def FTGOnlyTransition(state_machine: "StateMachine") -> Tuple[StateType, StateTy
 
 def NonObstacleTransition(state_machine: "StateMachine", close_to_raceline) -> Tuple[StateType, StateType]:
     if close_to_raceline:
-        return StateType.GB_TRACK, StateType.GB_TRACK
+        return StateType.RACELINE, StateType.RACELINE
 
     if state_machine._check_latest_wpnts(state_machine.recovery_wpnts, state_machine.cur_recovery_wpnts):
         if state_machine._check_on_spline(state_machine.cur_recovery_wpnts):
             return StateType.RECOVERY, StateType.RECOVERY
 
-    return StateType.LOSTLINE, StateType.GB_TRACK
+    return StateType.LOSTLINE, StateType.RACELINE
 
 
 def ObstacleTransition(state_machine: "StateMachine", close_to_raceline) -> Tuple[StateType, StateType]:
     recovery_availability = False
     if close_to_raceline and state_machine._check_free_frenet(state_machine.cur_gb_wpnts):
-        return StateType.GB_TRACK, StateType.GB_TRACK
+        return StateType.RACELINE, StateType.RACELINE
 
     # Overtake takeover always wins: compute it once (it mutates static_overtaking_mode)
     # and reuse below, so the recovery-hold branch can defer to it.
@@ -161,10 +161,10 @@ def ObstacleTransition(state_machine: "StateMachine", close_to_raceline) -> Tupl
         return StateType.OVERTAKE, StateType.OVERTAKE
     else:
         if close_to_raceline:
-            return StateType.TRAILING, StateType.GB_TRACK
+            return StateType.TRAILING, StateType.RACELINE
         elif recovery_availability:
             return StateType.TRAILING, StateType.RECOVERY
         elif state_machine._check_free_frenet(state_machine.cur_gb_wpnts):
-            return StateType.TRAILING, StateType.GB_TRACK
+            return StateType.TRAILING, StateType.RACELINE
         else:
-            return StateType.TRAILING, StateType.GB_TRACK
+            return StateType.TRAILING, StateType.RACELINE

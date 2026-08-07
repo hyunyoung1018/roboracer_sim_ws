@@ -16,8 +16,27 @@
 
   timetrials_only:=true is what makes the perception and planner packages
   unnecessary: with it set the state machine ignores /tracking/obstacles
-  entirely and stays in GB_TRACK, so nothing needs to publish obstacles,
+  entirely and stays in RACELINE, so nothing needs to publish obstacles,
   avoidance splines or recovery waypoints. Turn it off only once those exist.
+
+  RACELINE is what UNIST calls GB_TRACK; see state_machine/states_types.py.
+
+  No node started here publishes a transform. The chain is unchanged from
+  localization.launch.xml - albomb's URDF through robot_state_publisher for
+  everything rigid, the EKF for map -> odom - and the controller and state
+  machine only read frames, never claim them. The two they name are
+  parameters (base_frame, laser_frame), so they follow the URDF's
+  ego_racecar/* rather than the bare base_link/laser UNIST hardcodes.
+
+  WHY THE RACELINE'S START POSE MATTERS HERE, not just in generation: the
+  speed sectors are waypoint index ranges, and the state machine turns the
+  car's Frenet s into an index with `s / waypoints_dist`. That only lines up
+  because raceline_generator puts waypoint 0 at the start pose and we define
+  sector 0 to begin there too. Regenerate the raceline from a different start
+  pose and every sector boundary in speed_scaling.yaml moves with it - the
+  numbers stay valid, they just point somewhere else on the track. Sectors
+  also never wrap past the end for the same reason, which is what lets the
+  zone test be a plain `start <= idx <= end`.
 
   THE JOYSTICK IS THE BRAKE. simple_mux starts in neither mode and only passes
   commands through once a button is held:
