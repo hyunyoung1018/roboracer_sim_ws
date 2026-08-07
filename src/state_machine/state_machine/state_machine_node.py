@@ -492,7 +492,11 @@ class StateMachine(Node):
 
     def _setup_sector_live_update(self):
         # ROS2 replacement of ROS1 /dyn_sector_speed & /dyn_sector_overtake subscriptions
-        from rclpy.parameter_event_handler import ParameterEventHandler
+        try:
+            from rclpy.parameter_event_handler import ParameterEventHandler
+        except ImportError:
+            # Humble does not ship it; utilities/libraries carries the backport.
+            from parameter_event_handler.parameter_event_handler import ParameterEventHandler
         self._sector_evt_handler = ParameterEventHandler(self)
         self._sector_evt_cb_handle = self._sector_evt_handler.add_parameter_event_callback(
             self._sector_param_event_cb)

@@ -6,7 +6,13 @@ import numpy as np
 from visualization_msgs.msg import MarkerArray, Marker
 from tf_transformations import quaternion_from_euler
 
-from stack_master.parameter_event_handler import ParameterEventHandler
+# Humble's rclpy has no ParameterEventHandler; newer distros do. Try the
+# distro first so this disappears on its own after an upgrade, and fall back to
+# the backport in utilities/libraries.
+try:
+    from rclpy.parameter_event_handler import ParameterEventHandler
+except ImportError:
+    from parameter_event_handler.parameter_event_handler import ParameterEventHandler
 
 class SectorTuner(Node):
     """

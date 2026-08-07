@@ -11,7 +11,13 @@ import copy
 from frenet_conversion.frenet_converter import FrenetConverter
 import tqdm
 from tf_transformations import quaternion_from_euler
-from stack_master.parameter_event_handler import ParameterEventHandler
+# Humble's rclpy has no ParameterEventHandler; newer distros do. Try the
+# distro first so this disappears on its own after an upgrade, and fall back to
+# the backport in utilities/libraries.
+try:
+    from rclpy.parameter_event_handler import ParameterEventHandler
+except ImportError:
+    from parameter_event_handler.parameter_event_handler import ParameterEventHandler
 
 #from dynamic_reconfigure.msg import Config
 

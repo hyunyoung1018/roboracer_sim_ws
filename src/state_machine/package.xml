@@ -17,6 +17,7 @@
        cycle colcon cannot order. The paths this node used it for arrive as the
        config_dir and map_dir parameters instead. -->
   <depend>vel_planner</depend>
+  <depend>parameter_event_handler</depend>
 
   <exec_depend>ros2launch</exec_depend>
   <exec_depend>python3-numpy</exec_depend>
