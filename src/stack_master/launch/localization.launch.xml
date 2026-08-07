@@ -43,6 +43,8 @@
 -->
 <launch>
   <arg name="map" description="Map name (folder under stack_master/maps/)"/>
+  <arg name="teleop" default="true"
+       description="joy_teleop. false when a mux owns the drive topic instead."/>
   <arg name="hardware" default="true"
        description="Bring up the drivers. false if they are already running."/>
   <arg name="frenet" default="true"
@@ -64,6 +66,7 @@
       <!-- Closes the TF chain: the EKF publishes map -> odom, this fills in
            odom -> ego_racecar/base_link between corrections. -->
       <arg name="odom_tf" value="true"/>
+      <arg name="teleop" value="$(var teleop)"/>
     </include>
   </group>
 

@@ -1,0 +1,118 @@
+<?xml version="1.0"?>
+<!--
+  time_trials.launch.xml - drive the saved raceline, alone, no obstacles.
+
+  Sits on top of localization.launch.xml, which it includes. Pick a map that
+  has been through raceline_generator and the car follows its global waypoints.
+
+      ros2 launch stack_master time_trials.launch.xml map:=<name>
+
+  Ported from UNIST's race.launch.xml with the obstacle half left out:
+
+      state_machine     /global_waypoints_scaled + /global_waypoints/overtaking
+                        -> /behavior_strategy, /local_waypoints
+      controller_manager that -> /vesc/high_level/ackermann_cmd
+      simple_mux        arbitrates controller vs joystick -> /vesc/ackermann_cmd
+
+  timetrials_only:=true is what makes the perception and planner packages
+  unnecessary: with it set the state machine ignores /tracking/obstacles
+  entirely and stays in GB_TRACK, so nothing needs to publish obstacles,
+  avoidance splines or recovery waypoints. Turn it off only once those exist.
+
+  THE JOYSTICK IS THE BRAKE. simple_mux starts in neither mode and only passes
+  commands through once a button is held:
+
+      LB (4)  human  - your stick drives the car
+      RB (5)  auto   - the controller drives the car
+
+  Release both and the mux stops forwarding, which is what stops the car. It
+  also drops any source that goes stale, so a controller crash or a joystick
+  dropout both end in no command rather than the last one repeating.
+
+  joy_teleop is NOT started here. The mux reads /joy itself, and running both
+  would put two things on the same output.
+
+  Before the first autonomous run:
+    - the VESC calibration gains are still ForzaETH's (config/car/vesc.yaml)
+    - Allow Braking must be True in the VESC, or commanded decelerations do
+      nothing and the car will overshoot every corner
+    - start with speed_scaling well below 1.0 in the map's speed_scaling.yaml
+-->
+<launch>
+  <arg name="map" description="Map name (folder under stack_master/maps/)"/>
+  <arg name="localization" default="true"
+       description="Bring up localisation too. false if it is already running."/>
+  <arg name="timetrials_only" default="true"
+       description="Ignore obstacles. false needs perception and the planners."/>
+  <arg name="joy_max_speed" default="2.0"
+       description="[m/s] ceiling on the manual override, not on the controller"/>
+  <arg name="use_sim_time" default="false"/>
+  <arg name="rviz" default="true"/>
+  <arg name="foxglove" default="false"/>
+
+  <let name="config_dir" value="$(find-pkg-share stack_master)/config/car"/>
+
+  <!-- ===== everything below the driving logic ===== -->
+  <group if="$(var localization)">
+    <include file="$(find-pkg-share stack_master)/launch/localization.launch.xml">
+      <arg name="map" value="$(var map)"/>
+      <arg name="rviz" value="$(var rviz)"/>
+      <arg name="foxglove" value="$(var foxglove)"/>
+      <arg name="use_sim_time" value="$(var use_sim_time)"/>
+      <!-- simple_mux reads /joy itself; joy_teleop would be a second publisher
+           on the drive topic. -->
+      <arg name="teleop" value="false"/>
+    </include>
+  </group>
+
+  <!-- ===== sector parameters ===== -->
+  <!-- Not optional here: the state machine blocks at startup waiting for
+       /global_waypoints_scaled and /global_waypoints/overtaking, and these two
+       are what publish them. Both read their yaml from the map folder, so the
+       map must have been through raceline_generator. -->
+  <let name="map_dir" value="$(find-pkg-share stack_master)/maps/$(var map)"/>
+  <node pkg="sector_tuner" exec="sector_tuner" name="sector_tuner" output="screen">
+    <param from="$(var map_dir)/speed_scaling.yaml"/>
+    <param name="use_sim_time" value="$(var use_sim_time)"/>
+  </node>
+  <node pkg="sector_tuner" exec="ot_interpolator" name="ot_interpolator" output="screen">
+    <param from="$(var map_dir)/ot_sectors.yaml"/>
+    <param name="use_sim_time" value="$(var use_sim_time)"/>
+  </node>
+
+  <!-- ===== the racing brain ===== -->
+  <node pkg="state_machine" exec="state_machine" name="state_machine" output="screen">
+    <param from="$(var config_dir)/state_machine_params.yaml"/>
+    <param name="timetrials_only" value="$(var timetrials_only)"/>
+    <param name="sim" value="$(var use_sim_time)"/>
+    <param name="map" value="$(var map)"/>
+    <param name="use_sim_time" value="$(var use_sim_time)"/>
+    <!-- Our frenet republisher publishes /car_state/frenet/odom; UNIST's nodes
+         expect /car_state/odom_frenet. Remapped rather than renamed so the
+         republisher keeps the name race_stack gave it. -->
+    <remap from="/car_state/odom_frenet" to="/car_state/frenet/odom"/>
+  </node>
+
+  <!-- ===== the controller ===== -->
+  <node pkg="controller" exec="controller_manager" name="controller_manager" output="screen">
+    <param from="$(var config_dir)/controller.yaml"/>
+    <param name="save_yaml_path" value="$(var config_dir)/controller.yaml"/>
+    <param name="sim" value="$(var use_sim_time)"/>
+    <param name="use_sim_time" value="$(var use_sim_time)"/>
+    <remap from="/car_state/odom_frenet" to="/car_state/frenet/odom"/>
+    <!-- The VESC's IMU, under the name the controller expects. -->
+    <remap from="/imu/data" to="/vesc/sensors/imu/raw"/>
+  </node>
+
+  <!-- ===== command arbitration ===== -->
+  <!-- The only thing that reaches the VESC. Holding LB gives the stick control,
+       RB gives it to the controller, neither means no command at all. -->
+  <node pkg="stack_master" exec="simple_mux_node.py" name="simple_mux" output="screen">
+    <param name="in_topic"  value="/vesc/high_level/ackermann_cmd"/>
+    <param name="out_topic" value="/vesc/ackermann_cmd"/>
+    <param name="joy_max_speed" value="$(var joy_max_speed)"/>
+    <param name="use_estop" value="false"/>
+    <param name="sim" value="$(var use_sim_time)"/>
+    <param name="use_sim_time" value="$(var use_sim_time)"/>
+  </node>
+</launch>

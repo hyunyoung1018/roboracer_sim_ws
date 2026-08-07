@@ -27,6 +27,7 @@ endif()
 find_package(rosidl_default_generators REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
+  "msg/BehaviorStrategy.msg"
   "msg/CarState.msg"
   "msg/CarStateStamped.msg"
   "msg/GapData.msg"
@@ -34,11 +35,15 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/OTWpntArray.msg"
   "msg/Obstacle.msg"
   "msg/ObstacleArray.msg"
+  "msg/OppWpnt.msg"
+  "msg/OpponentTrajectory.msg"
   "msg/PidData.msg"
+  "msg/Prediction.msg"
+  "msg/PredictionArray.msg"
+  "msg/ProjOppPoint.msg"
+  "msg/ProjOppTraj.msg"
   "msg/Wpnt.msg"
   "msg/WpntArray.msg"
-  "msg/OpponentTrajectory.msg"
-  "msg/OppWpnt.msg"
   DEPENDENCIES 
   "std_msgs"
   "geometry_msgs"
