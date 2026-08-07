@@ -49,6 +49,11 @@
 # 0.76 is what the vendored subtree's own requirements.txt targets.
 trajectory_planning_helpers==0.76
 
+# Progress bars in sector_tuner's ot_interpolator and sector_slicer. Small, but
+# imported at module scope, so without it ot_interpolator does not start - and
+# the state machine waits forever on the topic it would have published.
+tqdm>=4.60
+
 # QP backend used by opt_min_curv / iqp_handler. Must be listed explicitly:
 # --no-deps means tph's own quadprog dependency is not resolved.
 #

@@ -36,6 +36,10 @@ class SectorTuner(Node):
         # get initial scaling
         self.sectors_params=self.parameters_to_dict()
         self.n_sectors = self.sectors_params['n_sectors']
+        self._scaling_fallback_warned = False
+        self.get_logger().info(
+            f"{self.n_sectors} sector(s) from speed_scaling.yaml, "
+            f"global_limit {self.sectors_params.get('global_limit')}")
         
         desc = ParameterDescriptor(type=ParameterType.PARAMETER_DOUBLE, floating_point_range=[FloatingPointRange(from_value=0.0, to_value=1.0, step=0.01)])
         self.set_descriptor('global_limit',descriptor=desc)
@@ -116,6 +120,7 @@ class SectorTuner(Node):
             s parameter whose sector we want to find
         """
         hl_change = 10
+        scaler = None
 
         if self.n_sectors > 1:
             for i in range(self.n_sectors):
@@ -166,6 +171,25 @@ class SectorTuner(Node):
                     )
         elif self.n_sectors == 1:
             scaler = self.sectors_params["Sector0"]['scaling']
+
+        if scaler is None:
+            # The branches above interpolate across sector boundaries and do not
+            # cover every s: a sector shorter than 2*hl_change has a gap in the
+            # middle, and n_sectors of 0 matches nothing at all. Falling off the
+            # end raised UnboundLocalError and killed the node, which stops the
+            # state machine, which stops the car. Use the scaling of whatever
+            # sector actually contains s.
+            scaler = 0.0
+            for i in range(self.n_sectors):
+                sec = self.sectors_params.get(f"Sector{i}", {})
+                if sec.get('start', 0) <= s <= sec.get('end', 0):
+                    scaler = sec.get('scaling', 0.0)
+                    break
+            if not self._scaling_fallback_warned:
+                self._scaling_fallback_warned = True
+                self.get_logger().warn(
+                    f"no sector interpolation covered index {s} "
+                    f"(n_sectors={self.n_sectors}); using {scaler}")
 
         return scaler
 

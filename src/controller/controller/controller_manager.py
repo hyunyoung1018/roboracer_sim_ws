@@ -187,10 +187,15 @@ class ControllerManager(Node):
             return
         if len(data.wpnts) < 2:
             return
-        self.waypoints = np.array([[wpnt.x_m, wpnt.y_m] for wpnt in data.wpnts])
+        self.waypoints = np.array(
+            [[wpnt.x_m, wpnt.y_m, wpnt.psi_rad] for wpnt in data.wpnts])
         # ROS1 read /global_republisher/track_length; derive from the waypoints' s_m
         self.track_length = data.wpnts[-1].s_m
-        self.converter = FrenetConverter(self.waypoints[:, 0], self.waypoints[:, 1])
+        # Three arguments, not two: UNIST's FrenetConverter took x and y and
+        # derived the heading; ours is race_stack's and is given it. Every other
+        # caller in this workspace already passes psi.
+        self.converter = FrenetConverter(
+            self.waypoints[:, 0], self.waypoints[:, 1], self.waypoints[:, 2])
         self.controller = Controller(
             self.t_clip_min, self.t_clip_max, self.m_l1, self.q_l1,
             self.curvature_factor,
