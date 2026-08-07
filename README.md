@@ -171,6 +171,18 @@ Things that have actually broken this workspace, or will.
   system-wide with a `/usr/bin/python3` shebang, and running it directly bakes
   that interpreter into every generated node script — which then cannot see the
   venv, `f1tenth_gym` included.
+
+  Rebuilding does not undo it: the shebang is written into scripts that already
+  exist, so the wrong one survives every later build. Recover with
+
+  ```bash
+  rm -rf build install log
+  python -m colcon build --symlink-install
+  ```
+
+  The symptom is a node dying on `ModuleNotFoundError` for a package that
+  imports perfectly well in your shell. That mismatch is the tell — same
+  machine, same venv, different interpreter.
 - **Never `pip install matplotlib` or `opencv-python`.** apt's matplotlib ships
   `mpl_toolkits` as a regular package and pip's ships it as a namespace one; a
   pip matplotlib wins for `matplotlib` while apt still wins for `mpl_toolkits`,
