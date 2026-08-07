@@ -26,9 +26,15 @@
        what we claim about it. Adding roll=pi here describes the chip instead
        of the data and applies the flip a second time.
 
-       So: up = +imu.z, and the yaw rate is +angular_velocity.z. That agrees
-       with the earlier check of rotating the car counter-clockwise and
-       watching angular_velocity.z go positive.
+       So: up = +imu.z, and the yaw rate is +angular_velocity.z. Confirmed on
+       the same topic by turning the car slowly counter-clockwise - z rose to
+       +0.24 rad/s and held there for the whole turn, then came back to zero.
+
+       VESC TOOL DISAGREES AND IS NOT WRONG. Its display shows a positive yaw
+       for a RIGHT turn, because it uses the aviation convention where yaw runs
+       like a compass heading; ROS (REP-103) has positive yaw counter-clockwise.
+       Reading that + as "the board is upside down" is what put roll=pi in here
+       once. Judge this from the topic, never from the tool.
 
        STILL UNVERIFIED is +90 vs -90, which this static reading cannot show
        and which only sets the longitudinal axis, not the yaw rate. At +90,
