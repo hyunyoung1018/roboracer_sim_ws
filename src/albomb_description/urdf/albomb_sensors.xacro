@@ -11,7 +11,11 @@
     </visual>
   </link>
 
-  <!-- VESC 6 MkVI onboard IMU. Yaw +90 deg; no roll.
+  <!-- VESC 6 MkVI onboard IMU. Yaw -90 deg; no roll.
+
+       The board is mounted turned 90 deg CLOCKWISE from the car's forward
+       direction, so the imu frame is -90 about z from base_link. Sign follows
+       from that directly: rpy rotates child vectors into the parent.
 
        The chip is mounted upside down on the board, but the FIRMWARE already
        corrects for that, so the data reaching us is Z up. Measured, level and
@@ -36,10 +40,22 @@
        Reading that + as "the board is upside down" is what put roll=pi in here
        once. Judge this from the topic, never from the tool.
 
-       STILL UNVERIFIED is +90 vs -90, which this static reading cannot show
-       and which only sets the longitudinal axis, not the yaw rate. At +90,
-       forward = -imu.y, so accelerating forwards should drive imu.y negative.
-       If it goes positive, this is -1.5708.
+       With no roll and yaw -90 the axes are
+
+           forward = +imu.y    left = -imu.x    up = +imu.z
+
+       Confirm by pushing the car forwards: imu.y should go POSITIVE. (This
+       spent a while at +1.5708, from believing Z faced the floor. It is worth
+       knowing that Rz(+90)Rx(180) and Rz(-90) give the same forward axis, so
+       that combination was self-consistent right up until the accelerometer
+       showed Z was up.)
+
+       The yaw does not reach cartographer: it tracks in this frame and
+       publishes base_link, so a constant rotation between imu and laser is
+       applied and then taken back off, and 2D uses only gyro z, which a yaw
+       rotation leaves alone. Maps made before this was corrected are fine.
+       controller_manager is different - it reads the longitudinal component
+       out, so there the yaw matters.
 
        VESC Tool's own Imu Rotation (roll 7.4 / pitch -4.7 / yaw 0) is mounting
        tilt only. Leave the 90 out of it; this joint is where it belongs.
@@ -51,7 +67,7 @@
   <joint name="imu_joint" type="fixed">
     <parent link="${car_name}/base_link"/>
     <child link="${car_name}/imu"/>
-    <origin xyz="0.07 0.0 ${wheel_radius+0.04}" rpy="0 0 1.5708"/>
+    <origin xyz="0.07 0.0 ${wheel_radius+0.04}" rpy="0 0 -1.5708"/>
   </joint>
 
   <link name="${car_name}/laser">
