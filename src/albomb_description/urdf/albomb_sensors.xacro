@@ -11,20 +11,32 @@
     </visual>
   </link>
 
-  <!-- VESC 6 MkVI onboard IMU: yaw +90 deg and Z facing the floor, both
-       established on the car.
+  <!-- VESC 6 MkVI onboard IMU. Yaw +90 deg; no roll.
 
-       Roll pi is the Z flip, not a tilt. Together the two give
+       The chip is mounted upside down on the board, but the FIRMWARE already
+       corrects for that, so the data reaching us is Z up. Measured, level and
+       still, on /vesc/sensors/imu/raw:
 
-           forward = +imu.y    left = +imu.x    up = -imu.z
+           linear_acceleration:  x 0.139   y 0.082   z 9.910
 
-       so level and still, imu.z reads about -9.8, and the yaw rate is
-       -angular_velocity.z. That last one is what UNIST hardcoded for their own
-       car, which is a second, independent sign that this is the right way up.
+       An accelerometer at rest reads the reaction to gravity, so +9.9 on z is
+       z pointing up; a flipped frame would read -9.9. That topic comes
+       straight from the driver and never passes through this file, which is
+       what makes it a clean measurement of the sensor frame rather than of
+       what we claim about it. Adding roll=pi here describes the chip instead
+       of the data and applies the flip a second time.
 
-       VESC Tool's own Imu Rotation is roll 7.4 / pitch -4.7 / yaw 0 - mounting
-       tilt only. Do not put the 90 or the 180 in there as well; this joint is
-       where they belong, and the firmware would apply them twice.
+       So: up = +imu.z, and the yaw rate is +angular_velocity.z. That agrees
+       with the earlier check of rotating the car counter-clockwise and
+       watching angular_velocity.z go positive.
+
+       STILL UNVERIFIED is +90 vs -90, which this static reading cannot show
+       and which only sets the longitudinal axis, not the yaw rate. At +90,
+       forward = -imu.y, so accelerating forwards should drive imu.y negative.
+       If it goes positive, this is -1.5708.
+
+       VESC Tool's own Imu Rotation (roll 7.4 / pitch -4.7 / yaw 0) is mounting
+       tilt only. Leave the 90 out of it; this joint is where it belongs.
 
        This joint is the single description of the mounting. controller_manager
        reads it back through TF to rotate the IMU into the car's axes, and
@@ -33,7 +45,7 @@
   <joint name="imu_joint" type="fixed">
     <parent link="${car_name}/base_link"/>
     <child link="${car_name}/imu"/>
-    <origin xyz="0.07 0.0 ${wheel_radius+0.04}" rpy="3.141592 0 1.5708"/>
+    <origin xyz="0.07 0.0 ${wheel_radius+0.04}" rpy="0 0 1.5708"/>
   </joint>
 
   <link name="${car_name}/laser">
