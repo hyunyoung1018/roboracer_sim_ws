@@ -92,6 +92,7 @@ class ControllerManager(Node):
 
         self.use_sim = self._get_param('sim', False)
         self.wheelbase = self._get_param('wheelbase', 0.321)
+        self.steer_max = self._get_param('steer_max', 0.2955)
         self.measuring = self._get_param('measure', False)
         self.state_machine_rate = self._get_param('state_machine_rate', 40)
 
@@ -205,6 +206,7 @@ class ControllerManager(Node):
             self.speed_diff_thres, self.start_speed, self.start_curvature_factor,
             self.AEB_thres,
             self.converter,
+            steer_max=self.steer_max,
             predict_pub=self.predict_pub,
             logger_info=self.get_logger().info,
             logger_warn=self.get_logger().warning,

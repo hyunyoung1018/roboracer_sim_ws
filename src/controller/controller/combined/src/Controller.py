@@ -62,6 +62,7 @@ class Controller:
 
                 converter,
 
+                steer_max=0.2955,
                 predict_pub=None,
                 logger_info=logging.info,
                 logger_warn=logging.warning,
@@ -134,6 +135,7 @@ class Controller:
         self.start_curvature_factor = start_curvature_factor
 
         self.wheelbase = wheelbase
+        self.steer_max = steer_max
 
         self.start_mode = False
         self.future_lat_err = 0.0
@@ -349,7 +351,11 @@ class Controller:
         if abs(steering_angle - self.curr_steering_angle) > threshold:
             self.logger_info("steering angle clipped")
         steering_angle = np.clip(steering_angle, self.curr_steering_angle - threshold, self.curr_steering_angle + threshold)
-        steering_angle = np.clip(steering_angle, -0.53, 0.53)
+        # The car's own limit, not UNIST's 0.53. Steering past it does not
+        # bend the car any further - vesc_driver clips the servo command - but
+        # the controller would go on believing it had, and every term computed
+        # from the angle it thinks it commanded drifts from the one it got.
+        steering_angle = np.clip(steering_angle, -self.steer_max, self.steer_max)
 
         # np.clip passes NaN through unchanged, so guard curr_steering_angle
         # (the rate-limit/feedback anchor) against poisoning: only advance it on
