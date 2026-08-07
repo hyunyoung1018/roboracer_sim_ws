@@ -12,9 +12,10 @@ find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 
-# Executable node scripts. The DIRECTORY install below puts scripts/ under
-# share/, which is right for reading but not for running: `exec=` looks in
-# lib/<pkg>, so anything launched as a node needs to be listed here too.
+# Executable node scripts. `exec=` resolves against lib/<pkg>, so anything a
+# launch file starts as a node has to be installed here - scripts/ is not
+# installed as a directory, and would land under share/ if it were, where
+# nothing can run it.
 install(PROGRAMS
   scripts/simple_mux_node.py
   DESTINATION lib/${PROJECT_NAME}
