@@ -21,10 +21,10 @@
   <depend>robot_localization</depend>
   <depend>std_srvs</depend>
 
-  <!-- Not ported yet; re-add when the package lands. An exec_depend on a
-       package that does not exist makes `rosdep install` fail for the whole
-       workspace, not just this package. -->
-  <!-- <exec_depend>controller</exec_depend> -->
+  <!-- Every exec_depend below must name a package that exists. One that does
+       not makes `rosdep install` fail for the whole workspace, not just this
+       package, so add the dependency in the same commit as the package. -->
+
   <!-- hardware.launch.xml -->
   <exec_depend>vesc_driver</exec_depend>
   <exec_depend>vesc_ackermann</exec_depend>
