@@ -21,7 +21,7 @@
   it brings up the whole car, and their mapping launch includes it for exactly
   that reason. Named for what it does here.
 
-  NO COMMAND MUX YET. joy_teleop publishes straight to /vesc/ackermann_cmd, so
+  WITH NO MUX IN FRONT, joy_teleop publishes straight to /vesc/ackermann_cmd, so
   the joystick is the only thing that can drive. Once a controller exists there
   will be two publishers on that topic and they will fight; that is when an
   ackermann_mux goes in front, with teleop at the higher priority.
@@ -35,7 +35,10 @@
 <launch>
   <arg name="lidar"  default="true"  description="Start the Hokuyo driver"/>
   <arg name="vesc"   default="true"  description="Start the VESC driver and converters"/>
-  <arg name="teleop" default="true"  description="Start joy + joy_teleop"/>
+  <arg name="joy" default="true"
+       description="Joystick driver. Needed by joy_teleop AND by simple_mux,
+                    which reads /joy itself - do not switch it off with teleop"/>
+  <arg name="teleop" default="true"  description="Start joy_teleop"/>
   <arg name="description" default="true"
        description="Publish albomb's URDF. Turn off if something else already does."/>
   <!-- Default matches vesc.yaml, which points at a udev symlink. That rule has
@@ -112,17 +115,21 @@
   </group>
 
   <!-- ===== teleop ===== -->
-  <!-- joy_teleop publishes on `teleop`; remapped onto the topic
-       ackermann_to_vesc actually subscribes to. This remap is the piece a
-       command mux would replace. -->
-  <group if="$(var teleop)">
-    <node pkg="joy" exec="joy_node" name="joy" output="screen">
-      <param from="$(var config_dir)/joy_teleop.yaml"/>
-    </node>
+  <!-- Two arguments, not one. The driver publishes /joy, which simple_mux
+       reads directly; joy_teleop is only the path that turns /joy into a drive
+       command by itself. time_trials wants the first without the second, and
+       gating both on `teleop` left the mux with no buttons to read and the car
+       impossible to move. -->
+  <node pkg="joy" exec="joy_node" name="joy" output="screen" if="$(var joy)">
+    <param from="$(var config_dir)/joy_teleop.yaml"/>
+  </node>
 
-    <node pkg="joy_teleop" exec="joy_teleop" name="joy_teleop" output="screen">
-      <param from="$(var config_dir)/joy_teleop.yaml"/>
-      <remap from="teleop" to="/vesc/ackermann_cmd"/>
-    </node>
-  </group>
+  <!-- joy_teleop publishes on `teleop`; remapped onto the topic
+       ackermann_to_vesc actually subscribes to. When a mux owns the drive
+       topic this node is off and the mux does the remapping instead. -->
+  <node pkg="joy_teleop" exec="joy_teleop" name="joy_teleop" output="screen"
+        if="$(var teleop)">
+    <param from="$(var config_dir)/joy_teleop.yaml"/>
+    <remap from="teleop" to="/vesc/ackermann_cmd"/>
+  </node>
 </launch>

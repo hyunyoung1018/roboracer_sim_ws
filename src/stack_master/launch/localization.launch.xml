@@ -44,7 +44,8 @@
 <launch>
   <arg name="map" description="Map name (folder under stack_master/maps/)"/>
   <arg name="teleop" default="true"
-       description="joy_teleop. false when a mux owns the drive topic instead."/>
+       description="joy_teleop. false when a mux owns the drive topic instead.
+                    The joystick DRIVER stays on either way - the mux reads /joy."/>
   <arg name="hardware" default="true"
        description="Bring up the drivers. false if they are already running."/>
   <arg name="frenet" default="true"

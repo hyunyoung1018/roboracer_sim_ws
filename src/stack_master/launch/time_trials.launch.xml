@@ -49,8 +49,10 @@
   dropped the same way, so a controller crash or a joystick dropout both end in
   a commanded stop rather than the last speed repeating.
 
-  joy_teleop is NOT started here. The mux reads /joy itself, and running both
-  would put two things on the same output.
+  joy_teleop is NOT started here - the mux reads /joy itself, and running both
+  would put two things on the same output. The joystick DRIVER is still started:
+  without it nothing publishes /joy, the mux never sees a button, and the car
+  cannot be moved at all.
 
   Before the first autonomous run:
     - App Settings / General in the VESC: Timeout Brake Current is 0, so the
@@ -86,7 +88,8 @@
       <arg name="foxglove" value="$(var foxglove)"/>
       <arg name="use_sim_time" value="$(var use_sim_time)"/>
       <!-- simple_mux reads /joy itself; joy_teleop would be a second publisher
-           on the drive topic. -->
+           on the drive topic. This switches off joy_teleop only - the joy
+           driver is a separate argument and stays on. -->
       <arg name="teleop" value="false"/>
     </include>
   </group>
